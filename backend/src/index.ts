@@ -17,6 +17,8 @@ import { captchaController } from "./modules/captcha";
 import { poleController } from "./modules/pole";
 import { sensorArchiveController } from "./modules/sensor-archive";
 import { alertController } from "./modules/alert";
+import { recordingController, srsCallbackController } from "./modules/recording";
+import { systemLogController } from "./modules/system-log";
 import { websocketPlugin } from "./plugins/websocket";
 import { startMqttSubscriber, stopMqttSubscriber } from "./plugins/mqtt";
 import { heartbeatScanService } from "./modules/heartbeat-scan";
@@ -75,6 +77,9 @@ const app = new Elysia()
   .use(poleController)
   .use(sensorArchiveController)
   .use(alertController)
+  .use(recordingController)
+  .use(srsCallbackController)
+  .use(systemLogController)
   .use(websocketPlugin)
   .listen(env.PORT);
 
