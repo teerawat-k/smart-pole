@@ -1,0 +1,4 @@
+// Dashboard layout — auth guard + sider/header วางที่นี่
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return <div className="flex min-h-screen">{children}</div>;
+}

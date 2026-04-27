@@ -1,0 +1,76 @@
+services:
+  smart-pole-backend:
+    image: ${DOCKERHUB_USERNAME:-teerawatk}/smart-pole-backend:${IMAGE_TAG:-latest}
+    container_name: smart-pole-backend-${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - '${BACKEND_PORT:-7766}:7766'
+    volumes:
+      - ./volumes/logs:/app/logs
+      - /tmp
+      - /app/node_modules/.cache
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Bangkok
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=100M
+      - /app/node_modules/.cache:mode=0755,size=50M
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:7766/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    networks:
+      - smart-pole-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '20m'
+        max-file: '5'
+        compress: 'true'
+
+  smart-pole-frontend:
+    image: ${DOCKERHUB_USERNAME:-teerawatk}/smart-pole-frontend:${IMAGE_TAG:-latest}
+    container_name: smart-pole-frontend-${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - '${FRONTEND_PORT:-7765}:3000'
+    environment:
+      - NODE_ENV=production
+      - TZ=Asia/Bangkok
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - smart-pole-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+networks:
+  smart-pole-network:
+    external: true

@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+.pnp.*
+.yarn/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+.next/
+out/
+*.tsbuildinfo
+
+# Prisma
+backend/prisma/*.db
+
+# Uploads
+backend/uploads/
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+pino-*.log
+logs/
+
+# Caches
+.eslintcache
+.cache
+
+# Test
+coverage/
+test-results/
+playwright-report/
+e2e/**/screenshots/
+
+# Misc
+*.tgz
+*.bak
+
+# Project backup
+project-backup/
+
+# Reference assets (do not commit)
+SmartPole_Project.zip
+SmartPole_Database.sql

@@ -1,0 +1,28 @@
+// Smart Pole — Prisma schema
+// ทุก model ต้องมี audit + soft-delete fields ตาม convention (ดู backend/CLAUDE.md § "Model Convention")
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ตัวอย่าง model ตาม convention — ลบทิ้ง/แก้ตามจริง
+// model User {
+//   id           Int       @id @default(autoincrement())
+//   email        String    @unique
+//   passwordHash String
+//   isActive     Boolean   @default(true)
+//   deletedAt    DateTime?
+//   createdBy    Int
+//   updatedBy    Int?
+//   deletedBy    Int?
+//   createdAt    DateTime  @default(now())
+//   updatedAt    DateTime  @updatedAt
+//
+//   @@index([deletedAt])
+// }

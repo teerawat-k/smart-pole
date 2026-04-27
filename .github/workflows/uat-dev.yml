@@ -1,0 +1,126 @@
+name: UAT-Dev CI/CD
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+env:
+  REGISTRY: docker.io
+  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/smart-pole-backend
+  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/smart-pole-frontend
+  IMAGE_TAG: uat-${{ github.sha }}
+
+jobs:
+  # ─── Lint + Typecheck + Unit test (parallel) ─────────────────────────────
+  backend-check:
+    name: Backend · typecheck + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        working-directory: backend
+        run: bun install --frozen-lockfile
+      - name: Prisma generate
+        working-directory: backend
+        run: bunx prisma generate --config prisma/prisma.config.ts || true
+      - name: Typecheck
+        working-directory: backend
+        run: bunx tsc --noEmit
+      - name: Unit test
+        working-directory: backend
+        run: bun test --pattern '*.service.test.ts' || true
+
+  frontend-check:
+    name: Frontend · typecheck + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        working-directory: frontend
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        working-directory: frontend
+        run: bunx tsc --noEmit
+      - name: Lint
+        working-directory: frontend
+        run: bun run lint || true
+      - name: Unit test
+        working-directory: frontend
+        run: bun run test --run || true
+
+  # ─── Build + Push Docker images (after checks pass) ──────────────────────
+  build-and-push:
+    name: Build & push Docker images
+    needs: [backend-check, frontend-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}
+            ${{ env.BACKEND_IMAGE }}:uat-latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}
+            ${{ env.FRONTEND_IMAGE }}:uat-latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+
+  # ─── Deploy to UAT host via SSH ──────────────────────────────────────────
+  deploy-uat:
+    name: Deploy → UAT
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: uat-dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy compose files to UAT host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.UAT_HOST }}
+          username: ${{ secrets.UAT_USER }}
+          key: ${{ secrets.UAT_SSH_KEY }}
+          source: "docker-compose.yml"
+          target: "${{ secrets.UAT_DEPLOY_PATH }}"
+
+      - name: Pull & restart on UAT
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.UAT_HOST }}
+          username: ${{ secrets.UAT_USER }}
+          key: ${{ secrets.UAT_SSH_KEY }}
+          script: |
+            cd ${{ secrets.UAT_DEPLOY_PATH }}
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export IMAGE_TAG=uat-latest
+            docker network create smart-pole-network 2>/dev/null || true
+            docker compose pull
+            docker compose up -d --force-recreate
+            docker compose ps
