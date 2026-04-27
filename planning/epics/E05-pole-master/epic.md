@@ -1,25 +1,43 @@
 # E05 · Pole master module
 
-> CRUD เสาสัญญาณ + lookup + sensor capability flags
+> CRUD เสาสัญญาณ + lookup + sensor capability flags + MQTT credential
 > ฟังก์ชันอ้างอิง: `project-backup/backend/src/services/pole.service.ts`
 
 Priority: 2
 Blocked by: E02
-Status: todo
+Status: done
 
 ## Tasks
 
 | Task | ชื่อ | Status |
 |------|------|--------|
-| T01 | Prisma schema Pole — fields + indexes + soft delete | todo |
-| T02 | Pole module — CRUD + lookup + pagination | todo |
-| T03 | Status enum + status update flow | todo |
-| T04 | Pole MQTT credential — generate + store hashed | todo |
-| T05 | Block delete pole ที่มี recording/alert ค้าง | todo |
-| T06 | Geolocation validation (lat/lng range) | todo |
+| T01 | Prisma schema Pole + indexes + soft delete | done |
+| T02 | Pole module — CRUD + lookup + pagination | done |
+| T03 | Status enum + maintenance toggle | done |
+| T04 | MQTT credential generate + regenerate | done |
+| T05 | Block delete pole ที่มี recording/alert ค้าง | TODO (E09+E11) |
+| T06 | Geolocation validation (lat/lng) | done |
 
-## Notes
-- `poleStatus` เปลี่ยนเป็น Postgres enum (`online` | `offline` | `unknown` | `maintenance`)
-- เพิ่ม field `mqttUsername`, `mqttPasswordHash` (ใช้ใน T04)
-- Capability flags: `hasCamera`, `hasPm25Sensor`, `hasTempHumidity`, `hasLed`
-- ส่ง flags เข้า frontend ตัดสินใจว่า dashboard tile ไหนแสดง
+## Atomic Structure
+
+```
+src/modules/pole/
+├── pole.constants.ts
+├── pole.repository.ts
+├── pole.schema.ts
+├── pole.service.ts        (orchestrator ~45 LoC)
+├── pole.controller.ts
+├── flow/
+│   ├── generate-credential.ts (atom — pure helper, 5 tests)
+│   ├── create.ts
+│   ├── update.ts
+│   ├── set-maintenance.ts
+│   ├── regenerate-credential.ts
+│   └── soft-delete.ts
+└── index.ts
+```
+
+## Test Result
+- 5 unit tests + smoke E2E ผ่าน
+- All backend: **126 pass / 0 fail**
+- Migration: `20260427175308_add_pole`
