@@ -12,8 +12,8 @@ services:
     container_name: smart-pole-mosquitto
     restart: unless-stopped
     ports:
-      - '${MQTT_TCP_PORT:-7783}:1883'    # TCP MQTT
-      - '${MQTT_WS_PORT:-7791}:9001'     # WebSocket MQTT
+      - '7783:1883'    # TCP MQTT
+      - '7791:9001'    # WebSocket MQTT
     volumes:
       - ./infra/mosquitto/config:/mosquitto/config:ro
       - ./data/mosquitto/data:/mosquitto/data
@@ -29,9 +29,9 @@ services:
     container_name: smart-pole-srs
     restart: unless-stopped
     ports:
-      - '${SRS_RTMP_PORT:-7735}:1935'    # RTMP ingest
-      - '${SRS_HLS_PORT:-7780}:8080'     # HLS playback
-      - '${SRS_API_PORT:-7785}:1985'     # SRS HTTP API
+      - '7735:1935'    # RTMP ingest
+      - '7780:8080'    # HLS playback
+      - '7785:1985'    # SRS HTTP API
     volumes:
       - ./infra/srs/srs.conf:/usr/local/srs/conf/srs.conf:ro
       - ./data/recordings:/usr/local/srs/objs/nginx/html/recordings
@@ -42,24 +42,20 @@ services:
 
   # ─── Backend (Bun + Elysia) ────────────────────────────────────────────────
   backend:
-    image: ${DOCKERHUB_USERNAME:-teerawatk}/smart-pole-backend:${IMAGE_TAG:-latest}
+    image: teerawatk/smart-pole-backend:latest
     container_name: smart-pole-backend
     restart: unless-stopped
     build:
       context: ./backend
     ports:
-      - '${BACKEND_PORT:-7766}:7766'
+      - '7766:7766'
     env_file:
-      - .env
+      - ./backend/.env
     environment:
       TZ: Asia/Bangkok
-      NODE_ENV: ${NODE_ENV:-production}
-      PORT: 7766
-      # DATABASE_URL ชี้ไป host Postgres — ใช้ host.docker.internal (Docker Desktop) หรือ extra_hosts
-      DATABASE_URL: ${DATABASE_URL}
+      # Override host-aware values (backend/.env มี localhost — container ต้องใช้ host.docker.internal/service name)
       MQTT_BROKER_URL: mqtt://mosquitto:1883
       SRS_HLS_BASE: http://srs:8080
-      CORS_ORIGIN: http://localhost:${FRONTEND_PORT:-7765}
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     volumes:
@@ -86,22 +82,20 @@ services:
 
   # ─── Frontend (Next.js) ────────────────────────────────────────────────────
   frontend:
-    image: ${DOCKERHUB_USERNAME:-teerawatk}/smart-pole-frontend:${IMAGE_TAG:-latest}
+    image: teerawatk/smart-pole-frontend:latest
     container_name: smart-pole-frontend
     restart: unless-stopped
     build:
       context: ./frontend
     ports:
-      - '${FRONTEND_PORT:-7765}:7765'
+      - '7765:7765'
+    env_file:
+      - ./frontend/.env.local
     environment:
       TZ: Asia/Bangkok
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: production
       PORT: 7765
       HOSTNAME: 0.0.0.0
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:7766}
-      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:7766/ws}
-      NEXT_PUBLIC_HLS_BASE: ${NEXT_PUBLIC_HLS_BASE:-http://localhost:7780}
-      NEXT_PUBLIC_PROJECT_PREFIX: ${NEXT_PUBLIC_PROJECT_PREFIX:-smart-pole}
     depends_on:
       backend:
         condition: service_started
