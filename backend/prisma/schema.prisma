@@ -1,28 +1,17 @@
 // Smart Pole — Prisma schema
-// ทุก model ต้องมี audit + soft-delete fields ตาม convention (ดู backend/CLAUDE.md § "Model Convention")
+// ทุก master model ต้องมี audit + soft-delete fields ตาม convention (ดู backend/CLAUDE.md § "Model Convention")
+// ห้ามมี `isActive` field — ใช้ soft delete (`deletedAt`) อย่างเดียว
+// ใช้ status enum เฉพาะกิจถ้าต้อง "ปิดใช้งานชั่วคราว"
+//
+// Database: PostgreSQL 18 (smart_pole) บน localhost:5432
+// TimescaleDB extension: ติดตั้งทีหลัง — sensor hypertable (E08) จะใช้ table ปกติก่อน
+// แล้ว `SELECT create_hypertable(...)` เป็น migration เสริมเมื่อ Timescale พร้อม
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // url ถูกกำหนดผ่าน PrismaPg adapter ใน prisma.config.ts
 }
-
-// ตัวอย่าง model ตาม convention — ลบทิ้ง/แก้ตามจริง
-// model User {
-//   id           Int       @id @default(autoincrement())
-//   email        String    @unique
-//   passwordHash String
-//   isActive     Boolean   @default(true)
-//   deletedAt    DateTime?
-//   createdBy    Int
-//   updatedBy    Int?
-//   deletedBy    Int?
-//   createdAt    DateTime  @default(now())
-//   updatedAt    DateTime  @updatedAt
-//
-//   @@index([deletedAt])
-// }

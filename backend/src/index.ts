@@ -4,13 +4,13 @@ import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
 import { staticPlugin } from "@elysiajs/static";
-import { env } from "./config/env";
+import { env, isProd } from "./config/env";
 import { logger } from "./plugins/logger";
+import { prisma, pingDb } from "./plugins/prisma";
 import { AppError } from "./common/errors";
 
 // Module controllers — register ที่ตำแหน่งนี้
 // import { authController } from "./modules/auth";
-// import { branchController } from "./modules/branch";
 
 const app = new Elysia()
   .use(cors({ origin: env.CORS_ORIGIN, methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"] }))
@@ -41,9 +41,43 @@ const app = new Elysia()
     set.status = 500;
     return { success: false, error: { code: "INTERNAL_ERROR", message: "เกิดข้อผิดพลาดภายในระบบ" } };
   })
+  // ── Liveness — ไม่ต้อง auth, ไม่แตะ DB ──
   .get("/health", () => ({ success: true, data: { status: "ok" } }))
+  // ── Readiness — แตะ DB เช็คว่าพร้อมรับ traffic ──
+  .get("/health/ready", async ({ set }) => {
+    const dbOk = await pingDb();
+    if (!dbOk) {
+      set.status = 503;
+      return { success: false, error: { code: "DB_UNAVAILABLE", message: "ฐานข้อมูลไม่พร้อมใช้งาน" } };
+    }
+    return { success: true, data: { db: "ok" } };
+  })
   .listen(env.PORT);
 
-logger.info(`Server running on http://localhost:${env.PORT}`);
+logger.info(`🚀 Server running on http://localhost:${env.PORT} (${env.NODE_ENV})`);
+
+// ── Graceful shutdown ─────────────────────────────────────
+async function shutdown(signal: string): Promise<void> {
+  logger.info({ signal }, "Shutting down...");
+  await app.stop();
+  await prisma.$disconnect();
+  logger.info("Shutdown complete");
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));
+
+if (isProd) {
+  // เผื่อ uncaught — log + exit (ห้าม swallow ใน production)
+  process.on("uncaughtException", (err) => {
+    logger.fatal({ err }, "Uncaught exception");
+    process.exit(1);
+  });
+  process.on("unhandledRejection", (reason) => {
+    logger.fatal({ reason }, "Unhandled rejection");
+    process.exit(1);
+  });
+}
 
 export type App = typeof app;
