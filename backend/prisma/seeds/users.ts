@@ -1,13 +1,15 @@
 import { prisma } from "@/plugins/prisma";
 import { hashPassword } from "@/common/utils/password";
 
+// ⚠️ Dev/test default password — ห้ามใช้ใน production
+// Seed จะ upsert password เป็น 12345 (เพื่อให้ login ได้ทันทีตอน dev)
 const DEFAULT_ADMIN = {
   username: "admin",
   email: "admin@smartpole.local",
   firstName: "System",
   lastName: "Admin",
   mobileNo: "000-000-0000",
-  password: "Admin@1234",
+  password: "12345",
 };
 
 const SEED_USER_ID = 0;
@@ -16,15 +18,20 @@ export async function seedUsers(): Promise<void> {
   const adminRole = await prisma.role.findUnique({ where: { name: "admin" } });
   if (!adminRole) throw new Error("admin role missing — run seedRoles first");
 
-  const existing = await prisma.user.findUnique({ where: { username: DEFAULT_ADMIN.username } });
-  if (existing) {
-    console.log(`✅ Admin user already exists (id=${existing.id})`);
-    return;
-  }
-
   const passwordHash = await hashPassword(DEFAULT_ADMIN.password);
-  const user = await prisma.user.create({
-    data: {
+
+  const user = await prisma.user.upsert({
+    where: { username: DEFAULT_ADMIN.username },
+    update: {
+      // re-hash password ทุก seed (กัน hash format เปลี่ยนระหว่าง dev)
+      password: passwordHash,
+      roleId: adminRole.id,
+      status: "active",
+      loginFailCount: 0,
+      lockedUntil: null,
+      lockedReason: null,
+    },
+    create: {
       username: DEFAULT_ADMIN.username,
       email: DEFAULT_ADMIN.email,
       firstName: DEFAULT_ADMIN.firstName,
@@ -36,5 +43,5 @@ export async function seedUsers(): Promise<void> {
       createdBy: SEED_USER_ID,
     },
   });
-  console.log(`✅ Default admin created: ${user.username} / Admin@1234 (id=${user.id})`);
+  console.log(`✅ Admin upserted: ${user.username} / ${DEFAULT_ADMIN.password} (id=${user.id})`);
 }
