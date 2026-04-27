@@ -30,7 +30,19 @@ const USER_DETAIL_SELECT = {
   passwordChangedAt: true,
   createdAt: true,
   updatedAt: true,
-  role: { select: { id: true, name: true, description: true } },
+  role: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      isSystem: true,
+      permissions: {
+        select: {
+          permission: { select: { module: true, action: true } },
+        },
+      },
+    },
+  },
 } satisfies Prisma.UserSelect;
 
 const USER_LOOKUP_SELECT = {

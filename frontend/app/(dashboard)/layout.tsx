@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { AppSider } from "@/components/layout/app-sider";
+import { MeLoader } from "@/components/shared/me-loader";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen bg-[#F0F7FF]">
+      <MeLoader />
       <AppSider />
       <main className="flex-1 flex flex-col overflow-hidden w-full pt-12 md:pt-0">{children}</main>
     </div>
