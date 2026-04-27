@@ -7,39 +7,42 @@ import { staticPlugin } from "@elysiajs/static";
 import { env, isProd } from "./config/env";
 import { logger } from "./plugins/logger";
 import { prisma, pingDb } from "./plugins/prisma";
+import { requestIdPlugin } from "./common/middleware/request-id";
 import { AppError } from "./common/errors";
 
 // Module controllers — register ที่ตำแหน่งนี้
 // import { authController } from "./modules/auth";
 
 const app = new Elysia()
-  .use(cors({ origin: env.CORS_ORIGIN, methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"] }))
+  .use(cors({ origin: env.CORS_ORIGIN, methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"], exposeHeaders: ["x-request-id"] }))
   .use(swagger({ path: "/swagger" }))
   .use(staticPlugin({ prefix: "/uploads", assets: env.UPLOAD_DIR }))
-  .onError(({ error, set, code, request }) => {
-    const ctx = { method: request.method, url: request.url };
+  .use(requestIdPlugin)
+  .onError(({ error, set, code, request, store }) => {
+    const requestId = store.requestId;
+    const ctx = { requestId, method: request.method, url: request.url };
 
     if (code === "NOT_FOUND") {
       logger.warn(ctx, "Route not found");
       set.status = 404;
-      return { success: false, error: { code: "NOT_FOUND", message: "ไม่พบ API endpoint นี้" } };
+      return { success: false, error: { code: "NOT_FOUND", message: "ไม่พบ API endpoint นี้", requestId } };
     }
 
     if (code === "VALIDATION") {
       logger.warn(ctx, "Request validation failed");
       set.status = 400;
-      return { success: false, error: { code: "VALIDATION_ERROR", message: "ข้อมูลไม่ถูกต้อง" } };
+      return { success: false, error: { code: "VALIDATION_ERROR", message: "ข้อมูลไม่ถูกต้อง", requestId } };
     }
 
     if (error instanceof AppError) {
       logger.warn({ ...ctx, code: error.code }, error.message);
       set.status = error.statusCode;
-      return { success: false, error: { code: error.code, message: error.message } };
+      return { success: false, error: { code: error.code, message: error.message, requestId } };
     }
 
     logger.error({ err: error, ...ctx }, "Unexpected system error");
     set.status = 500;
-    return { success: false, error: { code: "INTERNAL_ERROR", message: "เกิดข้อผิดพลาดภายในระบบ" } };
+    return { success: false, error: { code: "INTERNAL_ERROR", message: "เกิดข้อผิดพลาดภายในระบบ", requestId } };
   })
   // ── Liveness — ไม่ต้อง auth, ไม่แตะ DB ──
   .get("/health", () => ({ success: true, data: { status: "ok" } }))
