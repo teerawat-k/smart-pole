@@ -11,6 +11,7 @@ import { requestIdPlugin } from "./common/middleware/request-id";
 import { AppError } from "./common/errors";
 import { auditController } from "./modules/audit";
 import { roleController } from "./modules/role";
+import { userController, meController } from "./modules/user";
 
 // Module controllers — register ที่ตำแหน่งนี้
 // import { authController } from "./modules/auth";
@@ -60,6 +61,8 @@ const app = new Elysia()
   // ── Module controllers ──
   .use(auditController)
   .use(roleController)
+  .use(userController)
+  .use(meController)
   .listen(env.PORT);
 
 logger.info(`🚀 Server running on http://localhost:${env.PORT} (${env.NODE_ENV})`);
