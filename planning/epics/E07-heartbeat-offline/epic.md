@@ -1,23 +1,52 @@
 # E07 · Heartbeat + persistent offline detection
 
-> Persistent offline detection — แทน in-memory setTimeout (legacy)
-> ใช้ Postgres `lastSeenAt` + cron + advisory lock
+> ใช้ Postgres `lastSeenAt` + node-cron + advisory lock — multi-instance safe
 
 Priority: 3
 Blocked by: E06
-Status: todo
+Status: done (T04 alert auto-create เลื่อนไป E11)
 
 ## Tasks
 
 | Task | ชื่อ | Status |
 |------|------|--------|
-| T01 | Scheduler plugin — cron + advisory lock | todo |
-| T02 | Offline detection job — `*/1 * * * *` | todo |
-| T03 | Pole heartbeat history (Influx) — write + query | todo |
-| T04 | Auto-create offline alert | todo |
-| T05 | Threshold config — เก็บใน DB ไม่ใช่ env | todo |
+| T01 | Scheduler plugin (cron + advisory lock) | done |
+| T02 | Offline detection job (* */1 * * * *) | done |
+| T03 | Heartbeat signal history (Postgres table) | done (E08 SensorHeartbeatSignal) |
+| T04 | Auto-create offline alert | TODO (E11) |
+| T05 | Threshold config (SystemConfig) | done |
+
+## Atomic Structure
+
+```
+src/plugins/scheduler.ts          # cron + runWithLock + registerJob
+src/modules/system-config/        # key-value config + 30s cache
+└── system-config.{repository,service,index}.ts
+src/modules/heartbeat-scan/
+├── heartbeat-scan.service.ts     # register cron job
+├── flow/
+│   └── scan-offline-poles.ts     # atom: query + bulk update + WS broadcast + audit
+└── index.ts
+```
+
+## Logic
+- cron `*/1 * * * *` — รัน scanOfflinePoles
+- threshold default = 3 min (DB config key `pole.offline_threshold_minutes`, can override at runtime)
+- query: `Pole WHERE poleStatus='online' AND deletedAt IS NULL AND lastSeenAt < now - threshold`
+- bulk update: `pole.updateMany({ id: { in: [...] } }, { poleStatus: 'offline' })`
+- per pole detected: broadcast WS `pole-status-changed` + audit log `STATUS_CHANGE` (userId=SYSTEM_USER_ID)
+
+## Multi-instance Safety
+- `pg_try_advisory_lock(hashKey)` — non-blocking
+- 1 instance ที่ได้ lock จะ run, instance อื่น skip
+- lock release in `finally` (ปลด lock แม้ fn throw)
+
+## Test Result
+- scheduler.test.ts: 3 unit tests (acquire/re-run/throw safety)
+- 140 unit tests pass / 0 fail
+- typecheck 0 errors
 
 ## Notes
-- offline threshold default 3 min — เก็บใน `SystemConfig` table (T05)
-- ทุก scan job log ผลใน audit (`HEARTBEAT_SCAN`) + metric
-- รองรับ multi-instance ผ่าน Postgres advisory lock (`pg_try_advisory_lock`)
+- T04 (auto-resolve offline alert + create alert) ทำใน E11
+- LWT (handle-heartbeat status=offline) ทำใน E06 แล้ว — เป็น real-time path
+- scan job เป็น safety net (กรณี LWT ไม่ trigger)

@@ -17,6 +17,8 @@ import { captchaController } from "./modules/captcha";
 import { poleController } from "./modules/pole";
 import { websocketPlugin } from "./plugins/websocket";
 import { startMqttSubscriber, stopMqttSubscriber } from "./plugins/mqtt";
+import { heartbeatScanService } from "./modules/heartbeat-scan";
+import { stopAllJobs } from "./plugins/scheduler";
 
 const app = new Elysia()
   .use(cors({ origin: env.CORS_ORIGIN, methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"], exposeHeaders: ["x-request-id"] }))
@@ -81,9 +83,17 @@ try {
   logger.error({ err }, "MQTT: failed to start subscriber");
 }
 
+// ── Start scheduler jobs ──
+try {
+  heartbeatScanService.start();
+} catch (err) {
+  logger.error({ err }, "Scheduler: failed to start");
+}
+
 // ── Graceful shutdown ─────────────────────────────────────
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, "Shutting down...");
+  stopAllJobs();
   await stopMqttSubscriber().catch(() => undefined);
   await app.stop();
   await prisma.$disconnect();

@@ -318,6 +318,16 @@ model SensorHeartbeatSignal {
   @@map("sensor_heartbeat_signal")
 }
 
+// ─── System Config (key-value, runtime tunable) ────────────────────────────
+model SystemConfig {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy Int?
+
+  @@map("system_configs")
+}
+
 // ─── Sensor: Unknown (debug) ───────────────────────────────────────────────
 // เก็บ payload ที่ schema ยังไม่รองรับ — admin ดูแล้วเพิ่ม sensor type ใหม่
 model SensorUnknown {
