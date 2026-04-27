@@ -11,9 +11,10 @@
     "db:studio": "bunx prisma studio",
     "db:generate": "bunx prisma generate --config prisma/prisma.config.ts",
     "lint": "bunx eslint src/",
-    "test": "bun test",
-    "test:unit": "bun test --pattern '*.service.test.ts'",
-    "test:integration": "bun test --pattern '*.integration.test.ts'",
+    "test": "bun run test:unit",
+    "test:unit": "bun run scripts/run-unit-tests.ts",
+    "test:integration": "bun run scripts/run-integration-tests.ts",
+    "test:all": "bun test",
     "test:watch": "bun test --watch",
     "setup": "mkdir -p data/uploads data/recordings"
   },
@@ -27,6 +28,7 @@
     "@prisma/client": "^7.5.0",
     "argon2": "^0.44.0",
     "elysia": "^1.4.27",
+    "mqtt": "^5.15.1",
     "pg": "^8.20.0",
     "pino": "^10.3.1",
     "zod": "^4.3.6"
@@ -34,6 +36,7 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@types/pg": "^8.18.0",
+    "aedes": "^1.0.2",
     "dotenv": "^17.4.2",
     "pino-pretty": "^13.1.3",
     "prisma": "^7.5.0",

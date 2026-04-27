@@ -16,6 +16,7 @@ import { authController, authProtectedController } from "./modules/auth";
 import { captchaController } from "./modules/captcha";
 import { poleController } from "./modules/pole";
 import { websocketPlugin } from "./plugins/websocket";
+import { startMqttSubscriber, stopMqttSubscriber } from "./plugins/mqtt";
 
 const app = new Elysia()
   .use(cors({ origin: env.CORS_ORIGIN, methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"], exposeHeaders: ["x-request-id"] }))
@@ -73,9 +74,17 @@ const app = new Elysia()
 
 logger.info(`🚀 Server running on http://localhost:${env.PORT} (${env.NODE_ENV})`);
 
+// ── Start MQTT subscriber (best-effort) ──
+try {
+  startMqttSubscriber();
+} catch (err) {
+  logger.error({ err }, "MQTT: failed to start subscriber");
+}
+
 // ── Graceful shutdown ─────────────────────────────────────
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, "Shutting down...");
+  await stopMqttSubscriber().catch(() => undefined);
   await app.stop();
   await prisma.$disconnect();
   logger.info("Shutdown complete");
