@@ -1,4 +1,10 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import { prisma } from "@/plugins/prisma";
 
-// ใช้สำหรับฟังก์ชัน repo/atom ที่รับ tx? เพื่อ run ใน transaction หรือใช้ singleton ก็ได้
-export type PrismaTx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
+/**
+ * Prisma transaction client หรือ singleton client
+ * ใช้กับ atom function ที่ต้องรับ `tx?: PrismaTx` เพื่อ compose ใน outer transaction
+ *
+ * pattern ภายใน atom: `const client = tx ?? prisma`
+ */
+export type PrismaTx = Prisma.TransactionClient | typeof prisma;
