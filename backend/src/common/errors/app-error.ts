@@ -1,3 +1,7 @@
+// ── AppError + subclasses ──────────────────────────────────
+// ทุก service ต้อง throw subclass ที่เหมาะ — ห้าม throw `AppError` ดิบ
+// onError ใน index.ts จะ map → response มาตรฐาน
+
 export class AppError extends Error {
   constructor(
     public readonly statusCode: number,
@@ -34,6 +38,13 @@ export class ForbiddenError extends AppError {
   constructor(code: string, message: string) {
     super(403, code, message);
     this.name = "ForbiddenError";
+  }
+}
+
+export class UnauthorizedError extends AppError {
+  constructor(code: string, message: string) {
+    super(401, code, message);
+    this.name = "UnauthorizedError";
   }
 }
 
