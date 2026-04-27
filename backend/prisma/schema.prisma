@@ -4,8 +4,7 @@
 // ใช้ status enum เฉพาะกิจถ้าต้อง "ปิดใช้งานชั่วคราว"
 //
 // Database: PostgreSQL 18 (smart_pole) บน localhost:5432
-// TimescaleDB extension: ติดตั้งทีหลัง — sensor hypertable (E08) จะใช้ table ปกติก่อน
-// แล้ว `SELECT create_hypertable(...)` เป็น migration เสริมเมื่อ Timescale พร้อม
+// TimescaleDB extension: ติดตั้งทีหลัง — sensor table (E08) จะใช้ Postgres ปกติก่อน
 
 generator client {
   provider = "prisma-client-js"
@@ -14,4 +13,22 @@ generator client {
 datasource db {
   provider = "postgresql"
   // url ถูกกำหนดผ่าน PrismaPg adapter ใน prisma.config.ts
+}
+
+// ── Audit Log ────────────────────────────────────────────────────────────
+// ทุก mutation ใน service เรียก auditService.log() แบบ fire-and-forget
+// ห้าม await — fail ตรงนี้ไม่ block business flow
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  action    String   // CREATE | UPDATE | DELETE | STATUS_CHANGE | REORDER | UPDATE_<FIELD> | ...
+  module    String   // pole | user | role | sensor | ...
+  targetId  Int
+  payload   Json?    // before/after diff หรือ extra context
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([module, targetId])
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_logs")
 }

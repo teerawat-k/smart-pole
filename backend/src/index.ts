@@ -9,6 +9,7 @@ import { logger } from "./plugins/logger";
 import { prisma, pingDb } from "./plugins/prisma";
 import { requestIdPlugin } from "./common/middleware/request-id";
 import { AppError } from "./common/errors";
+import { auditController } from "./modules/audit";
 
 // Module controllers — register ที่ตำแหน่งนี้
 // import { authController } from "./modules/auth";
@@ -55,6 +56,8 @@ const app = new Elysia()
     }
     return { success: true, data: { db: "ok" } };
   })
+  // ── Module controllers ──
+  .use(auditController)
   .listen(env.PORT);
 
 logger.info(`🚀 Server running on http://localhost:${env.PORT} (${env.NODE_ENV})`);
