@@ -1,10 +1,15 @@
 // Seed runner — เรียง parent → child (FK) — idempotent ทุก step
+import "../../src/config/env";
 import { prisma } from "@/plugins/prisma";
+import { seedPermissions } from "./permissions";
+import { seedRoles } from "./roles";
+import { seedUsers } from "./users";
 
 async function main() {
   console.log("🌱 Seeding...");
-  // import { seedUsers } from "./users";
-  // await seedUsers();
+  await seedPermissions();
+  await seedRoles();
+  await seedUsers();
   console.log("✅ Seed completed");
 }
 

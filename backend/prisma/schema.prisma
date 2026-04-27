@@ -1,7 +1,7 @@
 // Smart Pole — Prisma schema
 // ทุก master model ต้องมี audit + soft-delete fields ตาม convention (ดู backend/CLAUDE.md § "Model Convention")
 // ห้ามมี `isActive` field — ใช้ soft delete (`deletedAt`) อย่างเดียว
-// ใช้ status enum เฉพาะกิจถ้าต้อง "ปิดใช้งานชั่วคราว"
+// "ปิดใช้งานชั่วคราว" → ใช้ status enum เฉพาะกิจ
 //
 // Database: PostgreSQL 18 (smart_pole) บน localhost:5432
 // TimescaleDB extension: ติดตั้งทีหลัง — sensor table (E08) จะใช้ Postgres ปกติก่อน
@@ -15,20 +15,174 @@ datasource db {
   // url ถูกกำหนดผ่าน PrismaPg adapter ใน prisma.config.ts
 }
 
-// ── Audit Log ────────────────────────────────────────────────────────────
-// ทุก mutation ใน service เรียก auditService.log() แบบ fire-and-forget
-// ห้าม await — fail ตรงนี้ไม่ block business flow
+// ─── Audit Log ────────────────────────────────────────────────────────────
 model AuditLog {
   id        Int      @id @default(autoincrement())
   userId    Int
-  action    String   // CREATE | UPDATE | DELETE | STATUS_CHANGE | REORDER | UPDATE_<FIELD> | ...
-  module    String   // pole | user | role | sensor | ...
+  action    String
+  module    String
   targetId  Int
-  payload   Json?    // before/after diff หรือ extra context
+  payload   Json?
   createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([module, targetId])
   @@index([createdAt(sort: Desc)])
   @@map("audit_logs")
+}
+
+// ─── Permission (master) ──────────────────────────────────────────────────
+model Permission {
+  id                Int      @id @default(autoincrement())
+  module            String
+  action            String
+  category          String
+  categoryLabel     String
+  moduleLabel       String
+  actionLabel       String
+  actionDescription String?
+  createdAt         DateTime @default(now())
+
+  roles RolePermission[]
+
+  @@unique([module, action])
+  @@map("permissions")
+}
+
+// ─── Role ─────────────────────────────────────────────────────────────────
+model Role {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  isSystem    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdBy   Int
+  updatedBy   Int?
+  deletedAt   DateTime?
+  deletedBy   Int?
+
+  permissions RolePermission[]
+  users       User[]
+
+  @@index([deletedAt])
+  @@map("roles")
+}
+
+// ─── Role × Permission ────────────────────────────────────────────────────
+model RolePermission {
+  id           Int @id @default(autoincrement())
+  roleId       Int
+  permissionId Int
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────
+enum UserStatus {
+  active
+  disabled
+  locked
+}
+
+model User {
+  id        Int     @id @default(autoincrement())
+  username  String  @unique
+  email     String  @unique
+  password  String
+  firstName String
+  lastName  String
+  mobileNo  String?
+
+  roleId Int
+  role   Role @relation(fields: [roleId], references: [id])
+
+  status UserStatus @default(active)
+
+  loginFailCount Int       @default(0)
+  lockedUntil    DateTime?
+  lockedReason   String?
+
+  lastLoginAt       DateTime?
+  passwordChangedAt DateTime?
+  tokenVersion      Int       @default(1)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy Int
+  updatedBy Int?
+  deletedAt DateTime?
+  deletedBy Int?
+
+  refreshTokens RefreshToken[]
+
+  @@index([deletedAt])
+  @@index([roleId])
+  @@index([status])
+  @@map("users")
+}
+
+// ─── Refresh Token ────────────────────────────────────────────────────────
+model RefreshToken {
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  tokenHash    String    @unique
+  family       String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById Int?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([family])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// ─── Captcha Attempt ──────────────────────────────────────────────────────
+model CaptchaAttempt {
+  id          Int      @id @default(autoincrement())
+  sessionKey  String   @unique
+  captchaHash String
+  isSolved    Boolean  @default(false)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([expiresAt])
+  @@map("captcha_attempts")
+}
+
+// ─── System Log ───────────────────────────────────────────────────────────
+enum SystemLogType {
+  login_success
+  login_fail
+  logout
+  captcha_fail
+  page_access
+}
+
+model SystemLog {
+  id           BigInt        @id @default(autoincrement())
+  logType      SystemLogType
+  userId       Int?
+  usernameSnap String?
+  failReason   String?
+  pageKey      String?
+  ipAddress    String?
+  userAgent    String?
+  detail       Json?
+  createdAt    DateTime      @default(now())
+
+  @@index([logType])
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@map("system_logs")
 }
