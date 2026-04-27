@@ -49,6 +49,13 @@ e2e/**/screenshots/
 *.tgz
 *.bak
 
+# Runtime data volumes (mosquitto/recordings/uploads)
+# Postgres ใช้ local install ไม่อยู่ใน data/
+data/mosquitto/data/
+data/mosquitto/log/
+data/recordings/
+data/uploads/
+
 # Project backup
 project-backup/
 

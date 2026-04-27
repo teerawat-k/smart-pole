@@ -1,0 +1,9 @@
+# Per-pole ACL — เสาแต่ละต้น publish ได้แค่ topic ของตัวเอง
+# %u = username (= pole name)
+
+# Backend subscriber — รับทุก topic
+user backend-subscriber
+topic readwrite smartpole/#
+
+# Per-pole pattern (apply ทุก user ที่ login ด้วย mqtt username = pole name)
+pattern readwrite smartpole/%u/#
