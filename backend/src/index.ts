@@ -12,9 +12,8 @@ import { AppError } from "./common/errors";
 import { auditController } from "./modules/audit";
 import { roleController } from "./modules/role";
 import { userController, meController } from "./modules/user";
-
-// Module controllers — register ที่ตำแหน่งนี้
-// import { authController } from "./modules/auth";
+import { authController, authProtectedController } from "./modules/auth";
+import { captchaController } from "./modules/captcha";
 
 const app = new Elysia()
   .use(cors({ origin: env.CORS_ORIGIN, methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"], exposeHeaders: ["x-request-id"] }))
@@ -59,6 +58,9 @@ const app = new Elysia()
     return { success: true, data: { db: "ok" } };
   })
   // ── Module controllers ──
+  .use(captchaController)
+  .use(authController)
+  .use(authProtectedController)
   .use(auditController)
   .use(roleController)
   .use(userController)

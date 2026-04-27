@@ -3,7 +3,7 @@ import { ErrorCode } from "@/common/errors/codes";
 import { expectError } from "@/common/test-helpers/expect-error";
 
 // ── Mock setup ────────────────────────────────────────────
-const mockFindMany = mock(async () => ({ data: [], total: 0 }));
+const mockFindMany = mock(async () => ({ data: [] as unknown[], total: 0 }));
 const mockFindById = mock(async (_id: number) => null as unknown);
 const mockFindByName = mock(async (_name: string) => null as unknown);
 const mockFindLookup = mock(async () => [] as unknown[]);
@@ -75,7 +75,7 @@ beforeEach(() => {
 
 describe("roleService.list", () => {
   test("ส่งคืนผลจาก repository.findMany", async () => {
-    mockFindMany.mockResolvedValueOnce({ data: [{ id: 1 }, { id: 2 }], total: 2 });
+    mockFindMany.mockResolvedValueOnce({ data: [{ id: 1 }, { id: 2 }] as unknown[], total: 2 });
     const result = await roleService.list({ page: 1, limit: 20 });
     expect(result.total).toBe(2);
     expect(result.data).toHaveLength(2);
