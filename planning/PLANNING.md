@@ -1,92 +1,79 @@
 # Planning — Smart Pole
 
 > ภาพรวม epic + current sprint
-> ดูรายละเอียดแต่ละ task: `planning/epics/E{nn}-{name}/tasks/T{nn}.md`
-> Reference (ฟังก์ชันเดิม): `docs/legacy-analysis.md` + `project-backup/`
+> Reference: `docs/legacy-analysis.md` + `project-backup/`
 
 ---
 
 ## Overview
 
-| Epic | ชื่อ | Priority | Blocked by | Status |
-|------|------|----------|------------|--------|
-| E00 | Foundation — skeleton + plugins + error/audit core | 0 | — | todo |
-| E01 | Auth — login + captcha + lockout + JWT refresh | 1 | E00 | todo |
-| E02 | Module — Module/Permission master + RBAC cache | 1 | E00 | todo |
-| E03 | Module — Role + Permission management | 2 | E02 | todo |
-| E04 | Module — User management | 2 | E02,E03 | todo |
-| E05 | Module — Pole master | 2 | E02 | todo |
-| E06 | MQTT plugin + topic schema + handlers | 2 | E05 | todo |
-| E07 | Heartbeat + persistent offline detection | 3 | E06 | todo |
-| E08 | Sensor archive (InfluxDB write + history query) | 3 | E06 | todo |
-| E09 | Camera archive (MinIO + SRS callback + signed URL) | 3 | E05 | todo |
-| E10 | WebSocket plugin + invalidate broadcaster | 3 | E00 | todo |
-| E11 | Alert engine + threshold rules + notification | 4 | E07,E08,E10 | todo |
-| E12 | System log + Audit log (separated concerns) | 4 | E04 | todo |
-| E13 | Frontend foundation — layout + auth-store + DataTable + AppForm | 1 | E01 | todo |
-| E14 | Frontend — Login page + Auth guard + Sidebar | 2 | E13 | todo |
-| E15 | Frontend — Dashboard (live) | 4 | E14,E07,E08,E10 | todo |
-| E16 | Frontend — Camera Archive | 4 | E14,E09 | todo |
-| E17 | Frontend — Sensor Archive + CSV export | 4 | E14,E08 | todo |
-| E18 | Frontend — Pole Management | 3 | E14,E05 | todo |
-| E19 | Frontend — User Management | 3 | E14,E04 | todo |
-| E20 | Frontend — Role & Permission | 3 | E14,E03 | todo |
-| E21 | Frontend — My Profile + Change Password | 3 | E14,E04 | todo |
-| E22 | Frontend — System Log viewer | 4 | E14,E12 | todo |
-| E23 | Notification — toast + bell + read tracker | 5 | E11 | todo |
-| E24 | E2E test suite | 5 | E15-E22 | todo |
-| E25 | Test scenarios (.md → .xlsx → delivery) | 5 | E24 | todo |
-| E26 | DevOps — docker-compose stack + UAT deploy + backup | 5 | E00 | todo |
+| Epic | ชื่อ | Priority | Status |
+|------|------|----------|--------|
+| E00 | Foundation — skeleton + plugins + error/audit core | 0 | ✅ done |
+| E01 | Auth — login + captcha + lockout + JWT refresh | 1 | ✅ done |
+| E02 | Permission master + RBAC cache + seed | 1 | ✅ done |
+| E03 | Role + Permission management | 2 | ✅ done |
+| E04 | User management + /me | 2 | ✅ done |
+| E05 | Pole master + MQTT credential | 2 | ✅ done |
+| E06 | MQTT plugin + topic schema + handlers | 2 | ✅ done |
+| E07 | Heartbeat + persistent offline detection | 3 | ✅ done |
+| E08 | Sensor archive (1 table per sensor + facade) | 3 | ✅ done (Postgres mode) |
+| E09 | Camera archive (file system + SRS callback + signed URL) | 3 | ✅ done |
+| E10 | WebSocket plugin + invalidate broadcaster | 3 | ✅ done |
+| E11 | Alert engine + dedupe + auto-resolve | 4 | ✅ done |
+| E12 | System log + Audit log (query API) | 4 | ✅ done |
+| E13 | Frontend foundation — shadcn + layout + auth-store | 1 | ✅ done |
+| E14 | Frontend — Login + Auth guard + Sidebar | 2 | ✅ done |
+| E15 | Frontend — Dashboard (live + WS + HLS) | 4 | ✅ done |
+| E16 | Frontend — Camera Archive | 4 | ✅ done |
+| E17 | Frontend — Sensor Archive + CSV export | 4 | ✅ done |
+| E18 | Frontend — Pole Management | 3 | ✅ done |
+| E19 | Frontend — User Management | 3 | ✅ done |
+| E20 | Frontend — Role & Permission matrix | 3 | ✅ done |
+| E21 | Frontend — My Profile + Change Password | 3 | ✅ done |
+| E22 | Frontend — System Log + Audit Log viewer | 4 | ✅ done |
+| E23 | Notification — toast + bell + read tracker | 5 | ⏳ partial (toast only) |
+| E24 | E2E test suite (Playwright) | 5 | ⏳ todo |
+| E25 | Test scenarios (.md → .xlsx → delivery) | 5 | ⏳ todo |
+| E26 | DevOps — docker-compose stack + UAT deploy | 5 | ⚠️ partial (compose ready, deploy pending) |
 
 ---
 
-## Phase Plan
+## Current Status (snapshot)
 
-| Phase | Sprint | Epics | จุดประสงค์ |
-|---|---|---|---|
-| **0 Foundation** | 1 | E00 · E01 · E26 | atomic skeleton + auth + dev infra |
-| **1 RBAC** | 2 | E02 · E03 · E04 · E13 · E14 | permission core + frontend foundation + login screen |
-| **1 Master** | 3 | E05 · E18 · E19 · E20 · E21 | pole/user/role frontend ครบ |
-| **2 Ingress** | 4 | E06 · E07 · E08 · E10 | MQTT + heartbeat + sensor history + WS |
-| **3 Media** | 5 | E09 · E16 · E17 | camera + archive frontend |
-| **4 Realtime** | 6 | E11 · E15 · E23 | dashboard live + alert + notification |
-| **5 Audit** | 7 | E12 · E22 | log/audit + viewer |
-| **6 Quality** | 8 | E24 · E25 | E2E + delivery docs |
+### ✅ Complete
+- **Backend:** ทุก module + endpoint (auth, role, user, pole, sensor, mqtt, alert, recording, audit, system-log, websocket, heartbeat-scan)
+- **Frontend:** 9 pages (login, dashboard, poles, users, roles, alerts, camera, sensor, profile, system-logs, audit-logs)
+- **Schema:** 4 migrations (audit, RBAC+user, pole, sensors, system-config, alert+recording)
+- **Tests:** 143 backend unit pass + 9 integration pass / 0 fail
 
----
+### ⏳ Pending
+- E2E tests (Playwright)
+- Test scenarios → delivery .xlsx
+- DevOps deploy (docker-compose ready, UAT not deployed)
+- Notification bell (toast already done)
 
-## Current Sprint
-
-ยังไม่เริ่ม — รอ kickoff
-
----
-
-## Blocked
-
-—
+### Backend Test Stats
+- Unit: 143 / 0 fail (~250 expect calls)
+- Integration: 9 / 0 fail
+- Typecheck: 0 errors
 
 ---
 
-## รอลูกค้า Confirm
-
-- รายการ sensor type ทั้งหมด (PM2.5 + temp + humidity + อะไรอีก?)
-- LED control — phase นี้หรือ phase 2?
-- Image captcha (server render รูป) vs text captcha
-- MQTT credential — per-pole หรือ shared?
-- Threshold alert default ของแต่ละ sensor type
-- Recording retention — เก็บกี่วัน? auto-delete?
-- Multi-tenant scope
-- Branding (logo, สี theme หลัก)
+## Stretch (เพิ่มถ้ามีเวลา)
+- TimescaleDB extension installed → continuous aggregates + retention policies (E08.T08-T09)
+- Mosquitto config sync per-pole credential (E26.T03)
+- Notification bell + Web Push (E23)
+- Rate limit middleware (E01.T05 ส่วน rate-limit เลื่อน)
+- Lockout cron job auto-unlock (E01.T06)
+- Health check `/health/mqtt` (E06.T08)
 
 ---
 
-## Team Standards Reminder (กฎทุก task)
+## Team Standards Reminder
 
-- ทุก task ต้องมี **Test Guide** — ห้าม mark done ถ้าไม่ผ่านครบ
-- Backend mutation ต้องมี **audit log** (fire-and-forget) ตั้งแต่ task แรก
-- ทุก module ต้องมี **`/lookup`** endpoint ตั้งแต่ task แรก
-- ทุก service file > 80 LoC หรือ ≥ 3 concerns ต้องแยก `flow/` ทันที
-- ทุก mutation ต้องมี **WebSocket invalidate** หลัง commit
-- ทุก endpoint ต้องมี **Zod/TypeBox schema** + **explicit return type**
-- ทุก model ต้องมี `isActive`, `deletedAt`, `createdBy`, `updatedBy`, `createdAt`, `updatedAt`
-- หลังเสร็จ → `bunx tsc --noEmit` ทั้ง backend + frontend ต้อง 0 errors + run unit test ของ module
+- ทุก master model ห้ามมี `isActive` — ใช้ `deletedAt` + status enum เฉพาะกิจ
+- Service file > 80 LoC + side-effect ≥ 3 → split flow/
+- Mutation = audit log (fire-and-forget) + WS invalidate
+- Endpoint = TypeBox schema + explicit return type
+- ทุก commit pass `bunx tsc --noEmit` 0 errors + run unit test ของ module
