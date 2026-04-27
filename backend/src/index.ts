@@ -15,6 +15,7 @@ import { userController, meController } from "./modules/user";
 import { authController, authProtectedController } from "./modules/auth";
 import { captchaController } from "./modules/captcha";
 import { poleController } from "./modules/pole";
+import { websocketPlugin } from "./plugins/websocket";
 
 const app = new Elysia()
   .use(cors({ origin: env.CORS_ORIGIN, methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"], exposeHeaders: ["x-request-id"] }))
@@ -67,6 +68,7 @@ const app = new Elysia()
   .use(userController)
   .use(meController)
   .use(poleController)
+  .use(websocketPlugin)
   .listen(env.PORT);
 
 logger.info(`🚀 Server running on http://localhost:${env.PORT} (${env.NODE_ENV})`);
