@@ -7,6 +7,7 @@ import { sensorHeartbeatSignalService } from "@/modules/sensor-heartbeat-signal"
 import { prisma } from "@/plugins/prisma";
 import { logger } from "@/plugins/logger";
 import { broadcastPoleStatus } from "@/plugins/websocket";
+import { alertService, AlertType } from "@/modules/alert";
 
 export async function handleHeartbeatMessage(poleName: string, raw: unknown): Promise<void> {
   const parsed = heartbeatMessageSchema.safeParse(raw);
@@ -45,7 +46,6 @@ export async function handleHeartbeatMessage(poleName: string, raw: unknown): Pr
   const wasOffline = pole.poleStatus !== "online";
   await poleService.recordHeartbeat(poleName, time);
 
-  // write signal history
   await sensorHeartbeatSignalService.write({
     time,
     poleId: pole.id,
@@ -56,8 +56,11 @@ export async function handleHeartbeatMessage(poleName: string, raw: unknown): Pr
     logger.warn({ err, poleName }, "MQTT heartbeat: signal write failed");
   });
 
-  // broadcast เฉพาะตอนเปลี่ยน state (offline → online) เพื่อลด noise
   if (wasOffline) {
     broadcastPoleStatus(poleName, "online", time);
+    // auto-resolve open offline alert
+    await alertService.autoResolveForPole(pole.id, AlertType.POLE_OFFLINE).catch((err) => {
+      logger.warn({ err, poleName }, "MQTT heartbeat: auto-resolve offline alert failed");
+    });
   }
 }

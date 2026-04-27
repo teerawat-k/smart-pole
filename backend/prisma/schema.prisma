@@ -328,8 +328,61 @@ model SystemConfig {
   @@map("system_configs")
 }
 
+// ─── Alert ─────────────────────────────────────────────────────────────────
+enum AlertSeverity {
+  info
+  warning
+  critical
+}
+
+model Alert {
+  id           Int            @id @default(autoincrement())
+  poleId       Int
+  alertType    String
+  severity     AlertSeverity  @default(warning)
+  message      String
+  value        Decimal?       @db.Decimal(12, 4)
+  threshold    Decimal?       @db.Decimal(12, 4)
+
+  isResolved   Boolean        @default(false)
+  resolvedAt   DateTime?
+  resolvedById Int?
+  resolvedNote String?
+
+  triggeredAt  DateTime       @default(now())
+  createdAt    DateTime       @default(now())
+
+  @@index([poleId, isResolved, triggeredAt(sort: Desc)])
+  @@index([severity])
+  @@index([alertType])
+  @@map("alerts")
+}
+
+// ─── VideoRecording (camera DVR index) ─────────────────────────────────────
+model VideoRecording {
+  id            BigInt   @id @default(autoincrement())
+  poleId        Int
+  filename      String   @unique
+  storagePath   String
+  recordedDate  DateTime @db.Date
+  startTime     DateTime
+  endTime       DateTime
+  durationSec   Int
+  fileSizeBytes BigInt?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy Int       @default(0)
+  updatedBy Int?
+  deletedAt DateTime?
+  deletedBy Int?
+
+  @@index([poleId, recordedDate(sort: Desc)])
+  @@index([deletedAt])
+  @@map("video_recordings")
+}
+
 // ─── Sensor: Unknown (debug) ───────────────────────────────────────────────
-// เก็บ payload ที่ schema ยังไม่รองรับ — admin ดูแล้วเพิ่ม sensor type ใหม่
 model SensorUnknown {
   id        BigInt   @id @default(autoincrement())
   time      DateTime

@@ -1,10 +1,9 @@
 // ── Handler: event/alarm messages from hardware ────────────
-// TODO(E11): create alert via alertService.createFromMqtt
-// ตอนนี้ log + broadcast เป็น notification ก่อน
+// validate → resolve poleId → alertService.createFromMqtt
 import { eventMessageSchema } from "../schemas";
+import { alertService } from "@/modules/alert";
 import { prisma } from "@/plugins/prisma";
 import { logger } from "@/plugins/logger";
-import { broadcastToAll } from "@/plugins/websocket";
 
 export async function handleEventMessage(poleName: string, raw: unknown): Promise<void> {
   const parsed = eventMessageSchema.safeParse(raw);
@@ -27,10 +26,11 @@ export async function handleEventMessage(poleName: string, raw: unknown): Promis
     return;
   }
 
-  // TODO(E11): alertService.createFromMqtt + dedupe
-  logger.info({ poleName, eventType: msg.eventType, severity: msg.severity }, "MQTT event received");
-  broadcastToAll({
-    type: "pole-event",
-    payload: { poleName, eventType: msg.eventType, severity: msg.severity, message: msg.message, time: msg.timestamp },
+  await alertService.createFromMqtt({
+    poleId: pole.id,
+    alertType: msg.eventType,
+    severity: msg.severity,
+    message: msg.message,
+    triggeredAt: new Date(msg.timestamp),
   });
 }

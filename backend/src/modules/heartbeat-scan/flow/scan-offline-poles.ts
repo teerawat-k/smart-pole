@@ -1,12 +1,12 @@
 // ── Atom: scan offline poles ───────────────────────────────
 // Find poles with lastSeenAt < now - threshold AND status = online
-// Mark them offline + broadcast WS
-// (alert creation จะเพิ่มใน E11)
+// Mark offline + broadcast + audit + auto-create offline alert (dedupe)
 import { prisma } from "@/plugins/prisma";
 import { logger } from "@/plugins/logger";
 import { broadcastPoleStatus } from "@/plugins/websocket";
 import { systemConfigService } from "@/modules/system-config";
 import { auditService, AuditAction, SYSTEM_USER_ID } from "@/modules/audit";
+import { alertService, AlertType } from "@/modules/alert";
 
 export interface ScanResult {
   detected: number;
@@ -17,7 +17,6 @@ export async function scanOfflinePoles(): Promise<ScanResult> {
   const thresholdMinutes = await systemConfigService.get<number>("pole.offline_threshold_minutes", 3);
   const cutoff = new Date(Date.now() - thresholdMinutes * 60_000);
 
-  // หา pole ที่ status=online แต่ lastSeenAt เก่ากว่า cutoff
   const candidates = await prisma.pole.findMany({
     where: {
       poleStatus: "online",
@@ -44,6 +43,14 @@ export async function scanOfflinePoles(): Promise<ScanResult> {
       targetId: pole.id,
       payload: { from: "online", to: "offline", reason: "heartbeat_timeout", lastSeenAt: pole.lastSeenAt },
     });
+    await alertService
+      .createOrIgnore({
+        poleId: pole.id,
+        alertType: AlertType.POLE_OFFLINE,
+        severity: "warning",
+        message: `เสา ${pole.poleName} ขาดสัญญาณ heartbeat เกิน ${thresholdMinutes} นาที`,
+      })
+      .catch(() => undefined);
   }
 
   logger.info({ detected: candidates.length, thresholdMinutes }, "Scheduler: offline poles detected");
