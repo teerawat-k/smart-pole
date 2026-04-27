@@ -234,3 +234,102 @@ model Pole {
   @@index([deletedAt])
   @@map("poles")
 }
+
+// ─── Sensor Type Master ────────────────────────────────────────────────────
+// ลงทะเบียน sensor type ที่ระบบรู้จัก — เพิ่ม sensor ใหม่ผ่าน seed
+model SensorType {
+  id            Int      @id @default(autoincrement())
+  key           String   @unique // "pm25", "temperature", "humidity", "heartbeat_signal"
+  displayName   String
+  unit          String?
+  tableName     String // "sensor_pm25"
+  chartType     String? // "line" | "bar" | "gauge"
+  chartColor    String?
+  retentionDays Int      @default(365)
+  isEnabled     Boolean  @default(true)
+  // standard audit + soft delete
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdBy     Int
+  updatedBy     Int?
+  deletedAt     DateTime?
+  deletedBy     Int?
+
+  @@map("sensor_types")
+}
+
+// ─── Sensor: PM2.5 ─────────────────────────────────────────────────────────
+// 1 sensor type = 1 table — schema เฉพาะ (PM2.5 + PM10 + AQI)
+model SensorPm25 {
+  time       DateTime
+  poleId     Int
+  seq        BigInt
+  pm25       Float
+  pm10       Float?
+  aqi        Int?
+  rawJson    Json?
+  ingestedAt DateTime @default(now())
+
+  @@id([time, poleId])
+  @@index([poleId, time(sort: Desc)])
+  @@map("sensor_pm25")
+}
+
+// ─── Sensor: Temperature ───────────────────────────────────────────────────
+model SensorTemperature {
+  time        DateTime
+  poleId      Int
+  seq         BigInt
+  temperature Float // celsius (normalize ก่อน save)
+  unit        String   @default("celsius") // "celsius" | "fahrenheit" (raw payload)
+  rawJson     Json?
+  ingestedAt  DateTime @default(now())
+
+  @@id([time, poleId])
+  @@index([poleId, time(sort: Desc)])
+  @@map("sensor_temperature")
+}
+
+// ─── Sensor: Humidity ──────────────────────────────────────────────────────
+model SensorHumidity {
+  time       DateTime
+  poleId     Int
+  seq        BigInt
+  humidity   Float // %RH (0..100)
+  rawJson    Json?
+  ingestedAt DateTime @default(now())
+
+  @@id([time, poleId])
+  @@index([poleId, time(sort: Desc)])
+  @@map("sensor_humidity")
+}
+
+// ─── Sensor: Heartbeat Signal ──────────────────────────────────────────────
+model SensorHeartbeatSignal {
+  time           DateTime
+  poleId         Int
+  signalDbm      Int? // -120..0
+  uptimeSec      BigInt?
+  firmwareVersion String?
+  ingestedAt     DateTime @default(now())
+
+  @@id([time, poleId])
+  @@index([poleId, time(sort: Desc)])
+  @@map("sensor_heartbeat_signal")
+}
+
+// ─── Sensor: Unknown (debug) ───────────────────────────────────────────────
+// เก็บ payload ที่ schema ยังไม่รองรับ — admin ดูแล้วเพิ่ม sensor type ใหม่
+model SensorUnknown {
+  id        BigInt   @id @default(autoincrement())
+  time      DateTime
+  poleId    Int
+  sensorKey String
+  rawJson   Json
+  reason    String // "no_handler" | "validation_failed"
+  ingestedAt DateTime @default(now())
+
+  @@index([sensorKey, time(sort: Desc)])
+  @@index([poleId, time(sort: Desc)])
+  @@map("sensor_unknown")
+}
