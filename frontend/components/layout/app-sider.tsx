@@ -26,7 +26,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard",   label: "แดชบอร์ด",        icon: LayoutDashboard, permission: "dashboard:view" },
-  { href: "/camera",      label: "ภาพกล้อง",         icon: Video,            permission: "camera_archive:view" },
+  { href: "/camera",      label: "บันทึกกล้อง",      icon: Video,            permission: "camera_archive:view" },
   { href: "/sensor",      label: "ข้อมูลเซนเซอร์",    icon: Activity,         permission: "sensor_archive:view" },
   { href: "/poles",       label: "จัดการเสาสัญญาณ",  icon: AntennaIcon,      permission: "pole:view" },
   { href: "/users",       label: "จัดการผู้ใช้",      icon: Users,            permission: "user:view" },

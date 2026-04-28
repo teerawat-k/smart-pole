@@ -60,7 +60,7 @@ describe("AppError subclasses statusCode mapping", () => {
   });
 
   test("ConflictError = 409", () => {
-    const err = new ConflictError(ErrorCode.POLE_HAS_RECORDINGS, "ลบไม่ได้");
+    const err = new ConflictError(ErrorCode.COMMON_CONFLICT, "ลบไม่ได้");
     expect(err.statusCode).toBe(409);
     expect(err.name).toBe("ConflictError");
   });

@@ -23,23 +23,6 @@ services:
     networks:
       - smart-pole-network
 
-  # ─── SRS streaming server (RTMP push → HLS + DVR) ──────────────────────────
-  srs:
-    image: ossrs/srs:5
-    container_name: smart-pole-srs
-    restart: unless-stopped
-    ports:
-      - '7735:1935'    # RTMP ingest
-      - '7780:8080'    # HLS playback
-      - '7785:1985'    # SRS HTTP API
-    volumes:
-      - ./infra/srs/srs.conf:/usr/local/srs/conf/srs.conf:ro
-      - ./data/recordings:/usr/local/srs/objs/nginx/html/recordings
-    environment:
-      TZ: Asia/Bangkok
-    networks:
-      - smart-pole-network
-
   # ─── Backend (Bun + Elysia) ────────────────────────────────────────────────
   backend:
     image: ${DOCKERHUB_USERNAME:-teerawatk}/smart-pole-backend:${IMAGE_TAG:-latest}
@@ -55,12 +38,10 @@ services:
       TZ: Asia/Bangkok
       # Override host-aware values (backend/.env มี localhost — container ต้องใช้ host.docker.internal/service name)
       MQTT_BROKER_URL: mqtt://mosquitto:1883
-      SRS_HLS_BASE: http://srs:8080
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     volumes:
       - ./data/uploads:/app/data/uploads
-      - ./data/recordings:/app/data/recordings:ro
       - ./volumes/logs:/app/logs
     depends_on:
       mosquitto:

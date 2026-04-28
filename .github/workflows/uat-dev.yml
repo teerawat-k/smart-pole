@@ -138,15 +138,12 @@ jobs:
             JWT_REFRESH_EXPIRES=${{ vars.JWT_REFRESH_EXPIRES || '7d' }}
             CORS_ORIGIN=${{ vars.CORS_ORIGIN }}
             UPLOAD_DIR=data/uploads
-            RECORDINGS_DIR=data/recordings
             MQTT_BROKER_URL=${{ vars.MQTT_BROKER_URL || 'mqtt://mosquitto:1883' }}
             MQTT_USERNAME=${{ secrets.MQTT_USERNAME }}
             MQTT_PASSWORD=${{ secrets.MQTT_PASSWORD }}
             MQTT_CLIENT_ID=smart-pole-backend-uat
             MQTT_TIMESTAMP_DRIFT_MAX_SEC=300
             POLE_OFFLINE_THRESHOLD_MINUTES=${{ vars.POLE_OFFLINE_THRESHOLD_MINUTES || 5 }}
-            SRS_HLS_BASE=${{ vars.SRS_HLS_BASE || 'http://srs:8080' }}
-            SRS_DVR_TOKEN=${{ secrets.SRS_DVR_TOKEN }}
             LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
             EOF
 
@@ -157,19 +154,15 @@ jobs:
             docker network create smart-pole-network 2>/dev/null || true
 
             echo "📂 Fixing permissions for volumes..."
-            mkdir -p data/uploads data/recordings data/mosquitto/data data/mosquitto/log
+            mkdir -p data/uploads data/mosquitto/data data/mosquitto/log
             chmod -R 777 data 2>/dev/null || true
 
-            # ─── Mosquitto + SRS: ensure running + reload config ────────────
+            # ─── Mosquitto: ensure running + reload config ──────────────────
             # NOTE: UAT uses anonymous mode (mosquitto.conf: allow_anonymous true).
             # For production, generate passwordfile manually on the host.
             echo "🦟 Ensuring Mosquitto running..."
             docker compose up -d mosquitto
             docker compose kill -s HUP mosquitto 2>/dev/null || true   # reload conf without restart
-
-            echo "🎥 Ensuring SRS running..."
-            docker compose up -d srs
-            docker compose kill -s HUP srs 2>/dev/null || true
 
             # ─── Backend: pull → migrate → restart ──────────────────────────
             echo "📥 Pulling latest backend image..."
@@ -184,7 +177,7 @@ jobs:
             echo "🚀 Restarting backend container..."
             docker compose up -d --force-recreate backend
 
-            # ─── Health checks: backend + mosquitto + srs ───────────────────
+            # ─── Health checks: backend + mosquitto ─────────────────────────
             echo "⏳ Health checks..."
             sleep 10
             curl -fsS http://localhost:${{ vars.BACKEND_PORT || 7766 }}/health/ready \
@@ -195,13 +188,10 @@ jobs:
               -t '$SYS/broker/uptime' -C 1 -W 5 \
               || (docker compose logs mosquitto --tail 40 && exit 1)
 
-            curl -fsS http://localhost:${{ vars.SRS_API_PORT || 7785 }}/api/v1/versions \
-              || (docker compose logs srs --tail 40 && exit 1)
-
             echo "🧹 Cleaning up unused images..."
             docker image prune -f
 
-            echo "✅ Backend + Mosquitto + SRS deployment successful."
+            echo "✅ Backend + Mosquitto deployment successful."
 
       - name: Discord Notification - Success
         continue-on-error: true
@@ -264,7 +254,6 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
             NEXT_PUBLIC_WS_URL=${{ vars.NEXT_PUBLIC_WS_URL }}
-            NEXT_PUBLIC_HLS_BASE=${{ vars.NEXT_PUBLIC_HLS_BASE }}
             NEXT_PUBLIC_PROJECT_PREFIX=${{ vars.NEXT_PUBLIC_PROJECT_PREFIX || 'smart-pole-uat' }}
           cache-from: |
             type=gha,scope=frontend-${{ env.IMAGE_TAG }}

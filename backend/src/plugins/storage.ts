@@ -5,7 +5,7 @@ import { env } from "@/config/env";
 // ── File storage helpers ───────────────────────────────────
 // Local file system — เก็บใน volume mount (ไม่ใช้ MinIO)
 // Path convention: uploads/{module}/{YYYY}/{MM}/{id}-{ts}-{sanitized}.ext
-//                  recordings/{poleName}/{YYYY-MM-DD}/{HHMM}-{HHMM2}.mp4
+//                  uploads/camera/{poleName}/{YYYY-MM-DD}/{file}.mp4
 
 /** Sanitize filename — strip path traversal + non-ASCII → "_", limit ≤ 200 */
 export function sanitizeFilename(name: string): string {

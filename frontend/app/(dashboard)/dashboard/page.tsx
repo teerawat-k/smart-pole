@@ -4,9 +4,11 @@ import { useState, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { AppCombobox } from "@/components/layout/app-combobox";
-import { Wifi, WifiOff, Wrench, Antenna } from "lucide-react";
+import { Wifi, WifiOff, Wrench, Antenna, Video } from "lucide-react";
 import { usePoleLookup } from "@/hooks/api/use-poles";
 import { useSensorLatest } from "@/hooks/api/use-sensors";
+import { useClipDates, useClipList } from "@/hooks/api/use-camera-clips";
+import { cameraClipApi } from "@/lib/api/camera-clip";
 import { env } from "@/config/env";
 import type { PoleStatus } from "@/lib/api/pole";
 import { useAuthStore } from "@/stores/auth-store";
@@ -69,12 +71,56 @@ export default function DashboardPage() {
     ? (STATUS_CONFIG[selected.poleStatus] ?? STATUS_CONFIG.unknown)
     : STATUS_CONFIG.unknown;
   const StatusIcon = statusInfo.icon;
-  const hlsUrl = selected ? `${env.NEXT_PUBLIC_HLS_BASE}/live/${selected.poleName}.m3u8` : null;
 
   const poleOptions = useMemo(
     () => (poleLookup.data ?? []).map((p) => ({ id: p.id, label: `${p.poleName} (${p.installPlace})` })),
     [poleLookup.data],
   );
+
+  // ── Camera clip picker (date + file) ────────────────────
+  const [clipDate, setClipDate] = useState<string | null>(null);
+  const [clipFile, setClipFile] = useState<string | null>(null);
+
+  const dates = useClipDates(selected?.hasCamera ? selected.poleName : null);
+  const clips = useClipList(selected?.hasCamera ? selected.poleName : null, clipDate);
+
+  // เปลี่ยนเสา → reset
+  useEffect(() => {
+    setClipDate(null);
+    setClipFile(null);
+  }, [selectedId]);
+
+  // dates โหลดมา → เลือกวันใหม่สุด
+  useEffect(() => {
+    if (dates.data && dates.data.length > 0 && clipDate === null) {
+      setClipDate(dates.data[0]!.date);
+    }
+  }, [dates.data, clipDate]);
+
+  // clips โหลดมา → เลือกไฟล์ใหม่สุด
+  useEffect(() => {
+    if (clips.data && clips.data.length > 0 && clipFile === null) {
+      setClipFile(clips.data[0]!.filename);
+    }
+  }, [clips.data, clipFile]);
+
+  // เปลี่ยนวันที่ → reset ไฟล์
+  useEffect(() => {
+    setClipFile(null);
+  }, [clipDate]);
+
+  const dateOptions = useMemo(
+    () => (dates.data ?? []).map((d) => ({ id: d.date, label: `${d.date} (${d.fileCount})` })),
+    [dates.data],
+  );
+  const fileOptions = useMemo(
+    () => (clips.data ?? []).map((c) => ({ id: c.filename, label: c.filename })),
+    [clips.data],
+  );
+
+  const clipUrl = selected && clipDate && clipFile
+    ? cameraClipApi.buildStreamUrl(selected.poleName, clipDate, clipFile)
+    : null;
 
   return (
     <div className="h-full overflow-y-auto p-4 md:p-6 space-y-4">
@@ -132,31 +178,47 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Live camera */}
+      {/* Camera clip player */}
       {selected?.hasCamera && (
-        <div className="border rounded-md p-4">
-          <div className="text-sm font-medium mb-3">ภาพกล้องสด — {selected.poleName}</div>
+        <div className="border rounded-md p-4 space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="text-sm font-medium">บันทึกกล้อง — {selected.poleName}</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <AppCombobox
+                className="w-44"
+                options={dateOptions}
+                value={clipDate}
+                onChange={(v) => setClipDate(String(v))}
+                required
+                disabled={dates.isLoading || dateOptions.length === 0}
+              />
+              <AppCombobox
+                className="w-56"
+                options={fileOptions}
+                value={clipFile}
+                onChange={(v) => setClipFile(String(v))}
+                required
+                disabled={clips.isLoading || fileOptions.length === 0}
+              />
+            </div>
+          </div>
           <div className="bg-black aspect-video rounded overflow-hidden flex items-center justify-center">
-            {hlsUrl ? (
+            {clipUrl ? (
               <video
-                src={hlsUrl}
-                autoPlay
-                muted
+                key={clipUrl}
+                src={clipUrl}
                 controls
                 className="w-full h-full"
-                onError={(e) => {
-                  (e.currentTarget as HTMLVideoElement).poster = "";
-                }}
               >
                 เบราว์เซอร์ไม่รองรับการเล่นวิดีโอ
               </video>
             ) : (
-              <span className="text-gray-400">เลือกเสาที่มีกล้อง</span>
+              <div className="flex flex-col items-center text-gray-400">
+                <Video className="h-10 w-10 mb-2" />
+                {dates.data?.length === 0 ? "ไม่พบคลิปสำหรับเสานี้" : "เลือกวันที่และไฟล์"}
+              </div>
             )}
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            HLS: <code className="text-xs">{hlsUrl}</code>
-          </p>
         </div>
       )}
 

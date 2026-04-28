@@ -49,7 +49,6 @@ ENV_SECRETS=(
   "JWT_SECRET"
   "MQTT_USERNAME"
   "MQTT_PASSWORD"
-  "SRS_DVR_TOKEN"
 )
 
 for env in uat_dev_site production; do
@@ -65,14 +64,11 @@ done
 declare -A ENV_VARS=(
   ["NEXT_PUBLIC_API_URL"]="https://api.example.com"
   ["NEXT_PUBLIC_WS_URL"]="wss://api.example.com/ws"
-  ["NEXT_PUBLIC_HLS_BASE"]="https://stream.example.com"
   ["NEXT_PUBLIC_PROJECT_PREFIX"]="smart-pole"
   ["BACKEND_PORT"]="7766"
   ["FRONTEND_PORT"]="7765"
-  ["SRS_API_PORT"]="7785"
   ["CORS_ORIGIN"]="https://app.example.com"
   ["MQTT_BROKER_URL"]="mqtt://mosquitto:1883"
-  ["SRS_HLS_BASE"]="http://srs:8080"
   ["JWT_ACCESS_EXPIRES"]="15m"
   ["JWT_REFRESH_EXPIRES"]="7d"
   ["LOG_LEVEL"]="info"

@@ -15,9 +15,8 @@ const envSchema = z.object({
   // CORS
   CORS_ORIGIN: z.string().default("http://localhost:7765"),
 
-  // Storage
+  // Storage — camera clips: <UPLOAD_DIR>/camera/<poleName>/<YYYY-MM-DD>/<file>.mp4
   UPLOAD_DIR: z.string().default("data/uploads"),
-  RECORDINGS_DIR: z.string().default("data/recordings"),
 
   // MQTT (Mosquitto)
   MQTT_BROKER_URL: z.string().default("mqtt://localhost:7783"),
@@ -28,10 +27,6 @@ const envSchema = z.object({
 
   // Pole offline threshold (นาที) — background job mark offline ถ้า lastSeenAt เกิน
   POLE_OFFLINE_THRESHOLD_MINUTES: z.coerce.number().default(5),
-
-  // SRS streaming
-  SRS_HLS_BASE: z.string().default("http://localhost:7780"),
-  SRS_DVR_TOKEN: z.string().default("replace-me"),
 
   // Logging
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),

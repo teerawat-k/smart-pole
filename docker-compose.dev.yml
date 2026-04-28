@@ -1,7 +1,7 @@
-# Dev overlay — รัน infra เท่านั้น (mosquitto + srs)
+# Dev overlay — รัน infra เท่านั้น (mosquitto)
 # Postgres ใช้ตัวที่ลง local บนเครื่อง (port 5432)
-# ใช้: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d mosquitto srs
-# จากนั้น `bun dev` ใน backend/frontend (ต่อ Postgres + mqtt + srs ผ่าน localhost:77xx)
+# ใช้: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d mosquitto
+# จากนั้น `bun dev` ใน backend/frontend (ต่อ Postgres + mqtt ผ่าน localhost:77xx)
 
 name: smart-pole
 
@@ -10,12 +10,6 @@ services:
     ports:
       - '7783:1883'
       - '7791:9001'
-
-  srs:
-    ports:
-      - '7735:1935'
-      - '7780:8080'
-      - '7785:1985'
 
   backend:
     profiles: ['app']

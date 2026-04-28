@@ -142,9 +142,6 @@ model User {
   polesUpdated     Pole[]          @relation("PoleUpdater")
   polesDeleted     Pole[]          @relation("PoleDeleter")
   alertsResolved   Alert[]         @relation("AlertResolver")
-  recordingsCreated VideoRecording[] @relation("VideoRecordingCreator")
-  recordingsUpdated VideoRecording[] @relation("VideoRecordingUpdater")
-  recordingsDeleted VideoRecording[] @relation("VideoRecordingDeleter")
 
   @@index([deletedAt])
   @@index([roleId])
@@ -271,7 +268,6 @@ model Pole {
 
   readings      SensorReading[]
   alerts        Alert[]
-  recordings    VideoRecording[]
 
   @@index([poleStatus, lastSeenAt])
   @@index([deletedAt])
@@ -324,33 +320,5 @@ model Alert {
   @@index([poleId, isResolved, triggeredAt(sort: Desc)])
   @@index([severity])
   @@index([alertType])
-}
-
-// ─── VideoRecording (camera DVR index) ─────────────────────────────────────
-model VideoRecording {
-  id            BigInt   @id @default(autoincrement())
-  poleId        Int
-  filename      String   @unique
-  storagePath   String
-  recordedDate  DateTime @db.Date
-  startTime     DateTime
-  endTime       DateTime
-  durationSec   Int
-  fileSizeBytes BigInt?
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  createdBy Int?    // null = SRS callback (no user)
-  updatedBy Int?
-  deletedAt DateTime?
-  deletedBy Int?
-
-  pole    Pole  @relation(fields: [poleId], references: [id], onDelete: Cascade)
-  creator User? @relation("VideoRecordingCreator", fields: [createdBy], references: [id], onDelete: SetNull)
-  updater User? @relation("VideoRecordingUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
-  deleter User? @relation("VideoRecordingDeleter", fields: [deletedBy], references: [id], onDelete: SetNull)
-
-  @@index([poleId, recordedDate(sort: Desc)])
-  @@index([deletedAt])
 }
 
