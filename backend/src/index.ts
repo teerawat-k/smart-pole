@@ -8,6 +8,7 @@ import { env, isProd } from "./config/env";
 import { logger } from "./plugins/logger";
 import { prisma, pingDb } from "./plugins/prisma";
 import { requestIdPlugin } from "./common/middleware/request-id";
+import { securityHeadersPlugin } from "./common/middleware/security-headers";
 import { AppError } from "./common/errors";
 import { auditController } from "./modules/audit";
 import { roleController } from "./modules/role";
@@ -25,6 +26,7 @@ import { heartbeatScanService } from "./modules/heartbeat-scan";
 import { stopAllJobs } from "./plugins/scheduler";
 
 const app = new Elysia()
+  .use(securityHeadersPlugin)
   .use(cors({ origin: env.CORS_ORIGIN, methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"], exposeHeaders: ["x-request-id"] }))
   .use(swagger({ path: "/swagger" }))
   .use(staticPlugin({ prefix: "/uploads", assets: env.UPLOAD_DIR }))

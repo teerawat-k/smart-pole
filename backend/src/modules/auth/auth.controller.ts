@@ -1,10 +1,15 @@
 import { Elysia } from "elysia";
+import type { Server } from "bun";
 import { authService } from "./auth.service";
 import { loginSchema, refreshSchema, logoutSchema } from "./auth.schema";
 import { jwtAccessPlugin, authGuard } from "@/plugins/jwt";
+import { enforceRateLimit } from "@/common/middleware/rate-limit";
 
-function getIpAddress(headers: Record<string, string | undefined>): string | undefined {
-  return headers["x-forwarded-for"]?.split(",")[0]?.trim() ?? undefined;
+function getIpAddress(headers: Record<string, string | undefined>, server?: Server<unknown> | null, request?: Request): string | undefined {
+  const forwarded = headers["x-forwarded-for"]?.split(",")[0]?.trim();
+  if (forwarded) return forwarded;
+  if (server?.requestIP && request) return server.requestIP(request)?.address ?? undefined;
+  return undefined;
 }
 
 function getUserAgent(headers: Record<string, string | undefined>): string | undefined {
@@ -16,13 +21,16 @@ export const authController = new Elysia({ prefix: "/api/auth" })
   .use(jwtAccessPlugin)
   .post(
     "/login",
-    async ({ body, headers, jwt }) => {
+    async ({ body, headers, jwt, server, request }) => {
+      const ip = getIpAddress(headers, server, request) ?? "unknown";
+      enforceRateLimit(ip, { keyPrefix: "login", windowMs: 60_000, max: 10 });
+
       const result = await authService.login({
         username: body.username,
         password: body.password,
         sessionKey: body.sessionKey,
         captchaInput: body.captchaInput,
-        ipAddress: getIpAddress(headers),
+        ipAddress: ip,
         userAgent: getUserAgent(headers),
       });
 
@@ -48,10 +56,13 @@ export const authController = new Elysia({ prefix: "/api/auth" })
   )
   .post(
     "/refresh",
-    async ({ body, headers, jwt }) => {
+    async ({ body, headers, jwt, server, request }) => {
+      const ip = getIpAddress(headers, server, request) ?? "unknown";
+      enforceRateLimit(ip, { keyPrefix: "refresh", windowMs: 60_000, max: 20 });
+
       const result = await authService.refresh({
         refreshToken: body.refreshToken,
-        ipAddress: getIpAddress(headers),
+        ipAddress: ip,
         userAgent: getUserAgent(headers),
       });
 
@@ -79,11 +90,11 @@ export const authProtectedController = new Elysia({ prefix: "/api/auth" })
   .use(authGuard)
   .post(
     "/logout",
-    async ({ body, headers, user }) => {
+    async ({ body, headers, user, server, request }) => {
       await authService.logout({
         refreshToken: body.refreshToken,
         userId: user.id,
-        ipAddress: getIpAddress(headers),
+        ipAddress: getIpAddress(headers, server, request),
         userAgent: getUserAgent(headers),
       });
       return { success: true, message: "ออกจากระบบสำเร็จ" };
