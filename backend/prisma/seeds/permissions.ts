@@ -20,7 +20,6 @@ const PERMISSIONS: PermissionSeed[] = [
   ...buildModule("dashboard",      "Monitoring", "monitoring", "แดชบอร์ด",         ["view"]),
   ...buildModule("camera_archive", "Monitoring", "monitoring", "บันทึกกล้อง",      ["view", "delete"]),
   ...buildModule("sensor_archive", "Monitoring", "monitoring", "ข้อมูลเซนเซอร์",   ["view"]),
-  ...buildModule("alert",          "Monitoring", "monitoring", "การแจ้งเตือน",     ["view", "edit"]),
 
   // ── Master ──
   ...buildModule("pole", "ข้อมูลหลัก", "master", "เสาสัญญาณ", ["view", "create", "edit", "delete"]),

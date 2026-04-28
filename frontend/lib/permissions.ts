@@ -12,7 +12,6 @@ export const NAV_PERMISSIONS: NavPermission[] = [
   { href: "/dashboard",   permission: "dashboard:view" },
   { href: "/camera",      permission: "camera_archive:view" },
   { href: "/sensor",      permission: "sensor_archive:view" },
-  { href: "/alerts",      permission: "alert:view" },
   { href: "/poles",       permission: "pole:view" },
   { href: "/users",       permission: "user:view" },
   { href: "/roles",       permission: "role:view" },

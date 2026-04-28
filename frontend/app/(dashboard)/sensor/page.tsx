@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { AppCombobox } from "@/components/layout/app-combobox";
 import { DataTable } from "@/components/layout/data-table";
@@ -9,7 +8,6 @@ import type { Column, SortState } from "@/components/layout/data-table";
 import { usePoleLookup } from "@/hooks/api/use-poles";
 import { useSensorHistory } from "@/hooks/api/use-sensors";
 import { formatDateTime } from "@/lib/format";
-import { Download } from "lucide-react";
 import type { SensorReadingRow } from "@/lib/api/sensor";
 
 const SORT_WHITELIST = new Set(["seq", "ingestedAt", "pm25", "temperature", "humidity"]);
@@ -100,29 +98,6 @@ export default function SensorPage() {
     },
   ], []);
 
-  const handleExportCsv = () => {
-    if (!history.data?.data || history.data.data.length === 0) return;
-    const rows = history.data.data;
-    const header = ["ลำดับ", "เวลาบันทึก", "PM2.5 (µg/m³)", "อุณหภูมิ (°C)", "ความชื้น (%RH)"];
-    const lines = rows.map((r) =>
-      [
-        r.seq,
-        formatDateTime(r.ingestedAt),
-        r.pm25 ?? "",
-        r.temperature ?? "",
-        r.humidity ?? "",
-      ].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","),
-    );
-    const csv = "﻿" + [header.join(","), ...lines].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `sensor-${poleId}-${Date.now()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const selectedPoleName = poleOptions.find((p) => p.id === poleId)?.label ?? "";
 
   return (
@@ -147,16 +122,6 @@ export default function SensorPage() {
             required
           />
         </div>
-        <div className="flex-1" />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExportCsv}
-          disabled={!history.data?.data.length}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          ส่งออก CSV
-        </Button>
       </div>
 
       <DataTable<SensorReadingRow>

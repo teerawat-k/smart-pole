@@ -14,7 +14,6 @@ const USER_ROLE_PERMISSIONS: { module: string; actions: string[] }[] = [
   { module: "dashboard",      actions: ["view"] },
   { module: "camera_archive", actions: ["view"] },
   { module: "sensor_archive", actions: ["view"] },
-  { module: "alert",          actions: ["view"] },
 ];
 
 export async function seedRoles(): Promise<void> {

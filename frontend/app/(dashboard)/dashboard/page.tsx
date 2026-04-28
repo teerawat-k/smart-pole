@@ -4,10 +4,9 @@ import { useState, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { AppCombobox } from "@/components/layout/app-combobox";
-import { Wifi, WifiOff, Wrench, Antenna, AlertTriangle } from "lucide-react";
+import { Wifi, WifiOff, Wrench, Antenna } from "lucide-react";
 import { usePoleLookup } from "@/hooks/api/use-poles";
 import { useSensorLatest } from "@/hooks/api/use-sensors";
-import { useAlerts } from "@/hooks/api/use-alerts";
 import { env } from "@/config/env";
 import type { PoleStatus } from "@/lib/api/pole";
 import { useAuthStore } from "@/stores/auth-store";
@@ -41,13 +40,6 @@ export default function DashboardPage() {
     ? new Date(Number(sensors.data.latestReadingAt)).toLocaleString("th-TH", { hour12: false })
     : null;
 
-  const alerts = useAlerts({
-    page: 1,
-    limit: 5,
-    poleId: selectedId ?? undefined,
-    isResolved: false,
-  });
-
   useEffect(() => {
     if (!accessToken) return;
     const wsUrl = env.NEXT_PUBLIC_WS_URL + `?token=${accessToken}`;
@@ -58,9 +50,6 @@ export default function DashboardPage() {
         if (msg.type === "sensor-reading" || msg.type === "pole-status-changed") {
           qc.invalidateQueries({ queryKey: ["sensor"] });
           qc.invalidateQueries({ queryKey: ["pole"] });
-        }
-        if (msg.type === "alert-new" || msg.type === "alert-resolved") {
-          qc.invalidateQueries({ queryKey: ["alert"] });
         }
       } catch {
         // ignore non-JSON
@@ -119,7 +108,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Sensor summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
         <SensorCard
           label="PM2.5"
           value={sensors.data?.latestPm25 ?? null}
@@ -141,14 +130,6 @@ export default function DashboardPage() {
           color="bg-green-500"
           show={selected?.hasTempHumidity}
         />
-        <div className="border rounded-md p-4">
-          <div className="text-xs uppercase tracking-wider text-brand-muted mb-2">การแจ้งเตือน</div>
-          <div className="text-2xl font-bold text-primary-dark">
-            {alerts.data?.total ?? 0}
-            <span className="text-xs font-normal text-muted-foreground ml-1">รายการ</span>
-          </div>
-          <div className="h-1 rounded-full mt-3 bg-blue-500 opacity-30" />
-        </div>
       </div>
 
       {/* Live camera */}
@@ -179,27 +160,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Active alerts */}
-      <div className="border rounded-md p-4">
-        <div className="text-sm font-medium mb-3">การแจ้งเตือนล่าสุด</div>
-        {alerts.data?.data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">ไม่มีการแจ้งเตือนที่รอแก้ไข</p>
-        ) : (
-          <div className="space-y-2">
-            {alerts.data?.data.map((a) => (
-              <div key={a.id} className="flex items-start gap-2 p-2 rounded border-l-4 border-amber-500 bg-amber-50">
-                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-                <div className="text-sm flex-1">
-                  <div className="font-medium">{a.message}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {a.alertType} · {new Date(a.triggeredAt).toLocaleString("th-TH")}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
