@@ -52,14 +52,14 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-linear-to-br from-[#E1FEFE] via-[#F0F7FF] to-[#E3F2FD] p-4">
-      <Card className="w-full max-w-md shadow-2xl border-[#B2EBF2]">
+    <main className="min-h-screen flex items-center justify-center bg-linear-to-br from-sidebar via-brand-bg to-brand-bg-light p-4">
+      <Card className="w-full max-w-md shadow-2xl border-sidebar-border">
         <CardHeader className="text-center space-y-2">
           <div className="flex justify-center">
             <Image src="/logo.png" alt="Smart Pole" width={64} height={64} priority />
           </div>
-          <CardTitle className="text-2xl font-bold text-[#0D47A1]">Smart Pole</CardTitle>
-          <p className="text-sm text-[#4A90A4]">ระบบเฝ้าระวังเสาสัญญาณอัจฉริยะ</p>
+          <CardTitle className="text-2xl font-bold text-primary-dark">Smart Pole</CardTitle>
+          <p className="text-sm text-brand-muted">ระบบเฝ้าระวังเสาสัญญาณอัจฉริยะ</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -69,9 +69,7 @@ export default function LoginPage() {
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="admin"
                 required
-                autoComplete="username"
               />
             </div>
             <div className="space-y-2">
@@ -81,9 +79,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••"
                 required
-                autoComplete="current-password"
               />
             </div>
             <div className="space-y-2">
@@ -113,15 +109,13 @@ export default function LoginPage() {
                 id="captcha"
                 value={captchaInput}
                 onChange={(e) => setCaptchaInput(e.target.value.toUpperCase())}
-                placeholder="กรอกรหัสตามภาพ"
                 required
                 maxLength={6}
-                autoComplete="off"
               />
             </div>
             <Button
               type="submit"
-              className="w-full bg-[#1565C0] hover:bg-[#0D47A1]"
+              className="w-full"
               disabled={login.isPending || !captcha.data}
             >
               {login.isPending ? (
@@ -137,9 +131,6 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
-          <p className="mt-4 text-xs text-center text-muted-foreground">
-            Admin (dev): <code>admin / 12345</code>
-          </p>
         </CardContent>
       </Card>
     </main>

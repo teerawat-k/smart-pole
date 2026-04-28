@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,18 +62,20 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-3xl">
+    <div className="p-4 md:p-6 space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold text-[#0D47A1]">โปรไฟล์ของฉัน</h1>
-        <p className="text-sm text-[#4A90A4]">@{me.data?.username} — {me.data?.role?.description || me.data?.role?.name}</p>
+        <h1 className="text-2xl font-bold text-primary-dark">โปรไฟล์ของฉัน</h1>
+        <p className="text-sm text-brand-muted">@{me.data?.username} — {me.data?.role?.description || me.data?.role?.name}</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>ข้อมูลส่วนตัว</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={submitProfile} className="space-y-3">
+      <Tabs defaultValue="info">
+        <TabsList>
+          <TabsTrigger value="info">ข้อมูลส่วนตัว</TabsTrigger>
+          <TabsTrigger value="password">เปลี่ยนรหัสผ่าน</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="info" className="mt-6">
+          <form onSubmit={submitProfile} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="fn">ชื่อ</Label>
@@ -92,19 +94,14 @@ export default function ProfilePage() {
                 <Input id="mob" value={form.mobileNo} onChange={(e) => setForm({ ...form, mobileNo: e.target.value })} />
               </div>
             </div>
-            <Button type="submit" disabled={update.isPending} className="bg-[#1565C0]">
+            <Button type="submit" disabled={update.isPending}>
               {update.isPending ? "กำลังบันทึก..." : "บันทึก"}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </TabsContent>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>เปลี่ยนรหัสผ่าน</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={submitPassword} className="space-y-3 max-w-md">
+        <TabsContent value="password" className="mt-6">
+          <form onSubmit={submitPassword} className="space-y-4 max-w-sm">
             <div className="space-y-1.5">
               <Label>รหัสผ่านปัจจุบัน</Label>
               <Input type="password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} required />
@@ -117,13 +114,15 @@ export default function ProfilePage() {
               <Label>ยืนยันรหัสผ่านใหม่</Label>
               <Input type="password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} required minLength={8} />
             </div>
-            <Button type="submit" disabled={changePw.isPending} variant="default">
-              {changePw.isPending ? "กำลังเปลี่ยน..." : "เปลี่ยนรหัสผ่าน"}
-            </Button>
-            <p className="text-xs text-muted-foreground">หลังเปลี่ยนสำเร็จ ระบบจะ logout อัตโนมัติ</p>
+            <div className="space-y-1">
+              <Button type="submit" disabled={changePw.isPending}>
+                {changePw.isPending ? "กำลังเปลี่ยน..." : "เปลี่ยนรหัสผ่าน"}
+              </Button>
+              <p className="text-xs text-muted-foreground">หลังเปลี่ยนสำเร็จ ระบบจะ logout อัตโนมัติ</p>
+            </div>
           </form>
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

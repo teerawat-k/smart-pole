@@ -10,7 +10,7 @@ import { PaginationFooter } from "./pagination-footer";
 const DEFAULT_PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 /** Re-export public types — backward-compat */
-export type { Column, ColumnFilter, SummaryCell, DataTableProps } from "./types";
+export type { Column, ColumnFilter, SummaryCell, DataTableProps, SortState } from "./types";
 
 export function DataTable<T>({
   columns,

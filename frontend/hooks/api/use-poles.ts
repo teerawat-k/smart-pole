@@ -10,6 +10,19 @@ import {
   type PoleUpdateInput,
 } from "@/lib/api/pole";
 
+export function useSetMaintenance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, enabled, reason }: { id: number; enabled: boolean; reason?: string }) =>
+      poleApi.setMaintenance(id, enabled, reason),
+    onSuccess: (result) => {
+      toast.success(result.message);
+      qc.invalidateQueries({ queryKey: ["pole"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 export function usePoles(params?: PoleListParams) {
   return useQuery({
     queryKey: ["pole", "list", params],

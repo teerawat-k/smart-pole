@@ -11,46 +11,38 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 export interface ComboboxOption {
-  value: string;
+  id: string | number;
   label: string;
 }
 
 interface AppComboboxProps {
-  value: string;
-  onValueChange: (value: string) => void;
   options: ComboboxOption[];
-  placeholder?: string;
-  searchPlaceholder?: string;
-  emptyText?: string;
+  value: string | number | null;
+  onChange: (value: string | number) => void;
   className?: string;
   disabled?: boolean;
+  required?: boolean;
 }
 
 export function AppCombobox({
-  value,
-  onValueChange,
   options,
-  placeholder = "เลือก...",
-  searchPlaceholder = "ค้นหา...",
-  emptyText = "ไม่พบข้อมูล",
+  value,
+  onChange,
   className,
   disabled,
 }: AppComboboxProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const selected = options.find((o) => o.value === value);
+  const selected = options.find((o) => String(o.id) === String(value ?? ""));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          type="button"
           variant="outline"
           role="combobox"
           aria-expanded={open}
@@ -58,7 +50,7 @@ export function AppCombobox({
           className={cn("justify-between font-normal", className)}
         >
           <span className={cn(!selected && "text-muted-foreground")}>
-            {selected?.label ?? placeholder}
+            {selected?.label ?? "เลือก..."}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -68,23 +60,23 @@ export function AppCombobox({
         style={{ minWidth: "var(--radix-popover-trigger-width)", width: "auto" }}
       >
         <Command>
-          <CommandInput />
+          <CommandInput placeholder="ค้นหา..." />
           <CommandList>
-            <CommandEmpty>{emptyText}</CommandEmpty>
+            <CommandEmpty>ไม่พบข้อมูล</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
-                  key={option.value}
+                  key={option.id}
                   value={option.label}
                   onSelect={() => {
-                    onValueChange(option.value);
+                    onChange(option.id);
                     setOpen(false);
                   }}
                 >
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4 shrink-0",
-                      value === option.value ? "opacity-100" : "opacity-0"
+                      String(value ?? "") === String(option.id) ? "opacity-100" : "opacity-0",
                     )}
                   />
                   {option.label}

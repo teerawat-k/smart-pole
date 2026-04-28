@@ -92,7 +92,7 @@ export function AppCombobox({
       </PopoverTrigger>
       <PopoverContent className="min-w-[--radix-popover-trigger-width] w-auto p-0" align="start">
         <Command>
-          <CommandInput placeholder={placeholder} className="h-9" />
+          <CommandInput className="h-9" />
           <CommandList className="max-h-[300px] overflow-y-auto">
             <CommandEmpty>{emptyText}</CommandEmpty>
             {grouped ? (

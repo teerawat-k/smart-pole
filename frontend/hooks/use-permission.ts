@@ -7,11 +7,11 @@ export function usePermission() {
   const permissionSet = new Set(permissions);
 
   return {
+    /** ตรวจ permission แบบเต็ม "module:action" — system role bypass ทั้งหมด */
     hasPermission: (key: string) => isSystemRole || permissionSet.has(key),
-    /** ตรวจว่ามี menus:<action> permission หรือไม่ */
-    hasMenuPermission: (action: string) => isSystemRole || permissionSet.has(`menus:${action}`),
-    /** ตรวจว่ามี permission ที่ขึ้นต้นด้วย menus:<prefix> อย่างน้อย 1 ตัว */
-    hasAnyMenuPrefix: (prefix: string) =>
-      isSystemRole || permissions.some((p) => p.startsWith(`menus:${prefix}`)),
+    /** มี action ใดๆ ของ module นี้หรือไม่ (ใช้สำหรับ menu visibility) */
+    hasAnyOfModule: (module: string) =>
+      isSystemRole || permissions.some((p) => p.startsWith(`${module}:`)),
+    isSystemRole,
   };
 }

@@ -125,7 +125,7 @@ export function AppFormCombobox({
               align="start"
             >
               <Command className="w-full">
-                <CommandInput placeholder={placeholder} className="h-9" />
+                <CommandInput className="h-9" />
                 <CommandList
                   className="max-h-[300px] overflow-x-hidden overflow-y-auto"
                   onWheel={(e) => e.stopPropagation()}

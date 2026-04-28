@@ -7,7 +7,9 @@ export interface AuditLogItem {
   action: string;
   module: string;
   targetId: number;
-  payload: unknown;
+  payload: Record<string, unknown> | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
   createdAt: string;
 }
 
@@ -17,10 +19,7 @@ export interface SystemLogItem {
   userId: number | null;
   usernameSnap: string | null;
   failReason: string | null;
-  pageKey: string | null;
   ipAddress: string | null;
-  userAgent: string | null;
-  detail: unknown;
   createdAt: string;
 }
 

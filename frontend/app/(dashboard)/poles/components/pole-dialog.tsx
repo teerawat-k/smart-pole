@@ -121,24 +121,22 @@ export function PoleDialog({ open, onOpenChange, editingId }: PoleDialogProps) {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="poleName">ชื่อเสา *</Label>
+                <Label htmlFor="poleName" required>ชื่อเสา</Label>
                 <Input
                   id="poleName"
                   value={form.poleName}
                   onChange={(e) => setForm({ ...form, poleName: e.target.value })}
                   required
-                  placeholder="pole-001"
                   disabled={isEdit}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="installPlace">สถานที่ติดตั้ง *</Label>
+                <Label htmlFor="installPlace" required>สถานที่ติดตั้ง</Label>
                 <Input
                   id="installPlace"
                   value={form.installPlace}
                   onChange={(e) => setForm({ ...form, installPlace: e.target.value })}
                   required
-                  placeholder="ทางเข้าหลัก"
                 />
               </div>
               <div className="space-y-1.5">
@@ -147,20 +145,18 @@ export function PoleDialog({ open, onOpenChange, editingId }: PoleDialogProps) {
                   id="ddns"
                   value={form.ddnsHostname}
                   onChange={(e) => setForm({ ...form, ddnsHostname: e.target.value })}
-                  placeholder="example.ddns.net"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="ipCamera">IP Camera</Label>
+                <Label htmlFor="ipCamera">IP กล้อง</Label>
                 <Input
                   id="ipCamera"
                   value={form.ipCamera}
                   onChange={(e) => setForm({ ...form, ipCamera: e.target.value })}
-                  placeholder="192.168.1.100"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="lat">Latitude</Label>
+                <Label htmlFor="lat">ละติจูด</Label>
                 <Input
                   id="lat"
                   type="number"
@@ -169,11 +165,10 @@ export function PoleDialog({ open, onOpenChange, editingId }: PoleDialogProps) {
                   onChange={(e) =>
                     setForm({ ...form, latitude: e.target.value ? Number(e.target.value) : undefined })
                   }
-                  placeholder="13.7563"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="lng">Longitude</Label>
+                <Label htmlFor="lng">ลองจิจูด</Label>
                 <Input
                   id="lng"
                   type="number"
@@ -182,7 +177,6 @@ export function PoleDialog({ open, onOpenChange, editingId }: PoleDialogProps) {
                   onChange={(e) =>
                     setForm({ ...form, longitude: e.target.value ? Number(e.target.value) : undefined })
                   }
-                  placeholder="100.5018"
                 />
               </div>
             </div>
@@ -192,8 +186,8 @@ export function PoleDialog({ open, onOpenChange, editingId }: PoleDialogProps) {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {[
                   { key: "hasCamera", label: "กล้อง CCTV" },
-                  { key: "hasPm25Sensor", label: "PM2.5 Sensor" },
-                  { key: "hasTempHumidity", label: "Temp/Humidity" },
+                  { key: "hasPm25Sensor", label: "เซนเซอร์ PM2.5" },
+                  { key: "hasTempHumidity", label: "อุณหภูมิ/ความชื้น" },
                   { key: "hasLed", label: "LED" },
                 ].map((item) => (
                   <label
@@ -214,7 +208,7 @@ export function PoleDialog({ open, onOpenChange, editingId }: PoleDialogProps) {
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 ยกเลิก
               </Button>
-              <Button type="submit" disabled={isPending} className="bg-[#1565C0] hover:bg-[#0D47A1]">
+              <Button type="submit" disabled={isPending}>
                 {isPending ? "กำลังบันทึก..." : isEdit ? "บันทึก" : "เพิ่มเสา"}
               </Button>
             </DialogFooter>

@@ -58,7 +58,6 @@ export function ResetPasswordDialog({ target, onOpenChange }: Props) {
               onChange={(e) => setPassword(e.target.value)}
               minLength={8}
               required
-              placeholder="ขั้นต่ำ 8 ตัว ตัวอักษร + ตัวเลข"
             />
           </div>
           <DialogFooter>

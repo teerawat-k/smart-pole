@@ -12,13 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppCombobox } from "@/components/layout/app-combobox";
+
 import { useCreateUser, useUpdateUser, useUser } from "@/hooks/api/use-users";
 import type { RoleLookupItem } from "@/lib/api/role";
 import type { UserCreateInput } from "@/lib/api/user";
@@ -99,7 +94,7 @@ export function UserDialog({ open, onOpenChange, editingId, roles }: Props) {
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="username">Username *</Label>
+              <Label htmlFor="username" required>Username</Label>
               <Input
                 id="username"
                 value={form.username}
@@ -111,7 +106,7 @@ export function UserDialog({ open, onOpenChange, editingId, roles }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="email">Email *</Label>
+              <Label htmlFor="email" required>อีเมล</Label>
               <Input
                 id="email"
                 type="email"
@@ -121,7 +116,7 @@ export function UserDialog({ open, onOpenChange, editingId, roles }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="firstName">ชื่อ *</Label>
+              <Label htmlFor="firstName" required>ชื่อ</Label>
               <Input
                 id="firstName"
                 value={form.firstName}
@@ -130,7 +125,7 @@ export function UserDialog({ open, onOpenChange, editingId, roles }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="lastName">นามสกุล *</Label>
+              <Label htmlFor="lastName" required>นามสกุล</Label>
               <Input
                 id="lastName"
                 value={form.lastName}
@@ -147,26 +142,17 @@ export function UserDialog({ open, onOpenChange, editingId, roles }: Props) {
               />
             </div>
             <div className="space-y-1.5 col-span-2">
-              <Label>Role *</Label>
-              <Select
-                value={form.roleId ? String(form.roleId) : ""}
-                onValueChange={(v) => setForm({ ...form, roleId: Number(v) })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="-- เลือก role --" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((r) => (
-                    <SelectItem key={r.id} value={String(r.id)}>
-                      {r.description || r.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label required>บทบาท</Label>
+              <AppCombobox
+                options={roles.map((r) => ({ id: r.id, label: r.description || r.name }))}
+                value={form.roleId ?? null}
+                onChange={(v) => setForm({ ...form, roleId: Number(v) })}
+                required
+              />
             </div>
             {!isEdit && (
               <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="password">รหัสผ่าน *</Label>
+                <Label htmlFor="password" required>รหัสผ่าน</Label>
                 <Input
                   id="password"
                   type="password"
@@ -174,7 +160,6 @@ export function UserDialog({ open, onOpenChange, editingId, roles }: Props) {
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   required={!isEdit}
                   minLength={8}
-                  placeholder="ขั้นต่ำ 8 ตัว ต้องมีตัวอักษร + ตัวเลข"
                 />
               </div>
             )}
@@ -183,7 +168,7 @@ export function UserDialog({ open, onOpenChange, editingId, roles }: Props) {
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               ยกเลิก
             </Button>
-            <Button type="submit" disabled={isPending} className="bg-[#1565C0] hover:bg-[#0D47A1]">
+            <Button type="submit" disabled={isPending}>
               {isPending ? "กำลังบันทึก..." : "บันทึก"}
             </Button>
           </DialogFooter>

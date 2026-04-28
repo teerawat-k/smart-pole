@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Shield, Settings2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Settings2, Trash2 } from "lucide-react";
 import { useRoles, useDeleteRole } from "@/hooks/api/use-roles";
 import { useAppAlertDialog } from "@/hooks/use-app-alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/layout/data-table";
+import type { Column } from "@/components/layout/data-table";
+import { useClientSort } from "@/hooks/use-client-sort";
 import { CreateRoleDialog } from "./components/create-role-dialog";
 import { RolePermissionDialog } from "./components/role-permission-dialog";
+import type { RoleListItem } from "@/lib/api/role";
 
 export default function RolesPage() {
   const [createOpen, setCreateOpen] = useState(false);
@@ -17,80 +20,102 @@ export default function RolesPage() {
   const roles = useRoles();
   const del = useDeleteRole();
   const { confirm, AlertDialogComponent } = useAppAlertDialog();
+  const { sorted, sort, onSort } = useClientSort(roles.data?.data ?? []);
+
+  const columns = useMemo<Column<RoleListItem>[]>(() => [
+    {
+      title: "ชื่อบทบาท",
+      dataIndex: "description",
+      sorter: true,
+      render: (r) => (
+        <div className="flex items-center gap-2 font-medium text-primary-dark">
+          {r.description || r.name}
+          {r.isSystem && <Badge variant="outline" className="text-[10px]">ระบบ</Badge>}
+        </div>
+      ),
+    },
+    {
+      title: "ชื่อระบบ",
+      dataIndex: "name",
+      render: (r) => <span className="text-xs text-muted-foreground">{r.name}</span>,
+    },
+    {
+      title: "ผู้ใช้",
+      key: "users",
+      width: 80,
+      align: "center",
+      render: (r) => r._count.users,
+    },
+    {
+      title: "สิทธิ์",
+      key: "permissions",
+      width: 80,
+      align: "center",
+      render: (r) => r._count.permissions,
+    },
+    {
+      title: "",
+      key: "actions",
+      width: "fit",
+      fixed: "right",
+      render: (r) => (
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setEditingId(r.id)}
+            disabled={r.isSystem}
+          >
+            <Settings2 className="mr-1 h-3.5 w-3.5" />
+            จัดการสิทธิ์
+          </Button>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            className="text-destructive"
+            aria-label="ลบ"
+            disabled={r.isSystem || r._count.users > 0}
+            onClick={() =>
+              confirm({
+                title: "ลบบทบาท",
+                description: `ลบ "${r.description || r.name}"?`,
+                onAction: () => del.mutate(r.id),
+                actionVariant: "destructive",
+              })
+            }
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ),
+    },
+  ], [del, confirm]);
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
+    <div className="p-4 md:p-6 flex flex-col gap-4 h-full overflow-hidden">
+      <div className="flex items-center justify-between flex-wrap gap-2 shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-[#0D47A1]">Role &amp; Permission</h1>
-          <p className="text-sm text-[#4A90A4]">บทบาท {roles.data?.total ?? 0} รายการ</p>
+          <h1 className="text-2xl font-bold text-primary-dark">บทบาท &amp; สิทธิ์</h1>
+          <p className="text-sm text-brand-muted">บทบาท {roles.data?.total ?? 0} รายการ</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="bg-[#1565C0] hover:bg-[#0D47A1]">
+        <Button onClick={() => setCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          เพิ่ม Role
+          เพิ่มบทบาทใหม่
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {roles.data?.data.map((r) => (
-          <Card key={r.id}>
-            <CardContent className="pt-6 space-y-3">
-              <div className="flex items-start gap-3">
-                <Shield className="h-8 w-8 text-[#1565C0] shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-[#0D47A1] flex items-center gap-2">
-                    {r.description || r.name}
-                    {r.isSystem && (
-                      <Badge variant="outline" className="text-[10px]">
-                        SYSTEM
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground">{r.name}</div>
-                </div>
-              </div>
-              <div className="text-xs text-muted-foreground space-y-0.5">
-                <div>👤 ผู้ใช้: {r._count.users} คน</div>
-                <div>🔒 Permission: {r._count.permissions} รายการ</div>
-              </div>
-              <div className="flex gap-2 pt-2 border-t">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setEditingId(r.id)}
-                  disabled={r.isSystem}
-                >
-                  <Settings2 className="mr-1 h-3.5 w-3.5" />
-                  จัดการ Permission
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-destructive ml-auto"
-                  disabled={r.isSystem || r._count.users > 0}
-                  onClick={() =>
-                    confirm({
-                      title: "ลบ Role",
-                      description: `ลบ "${r.description || r.name}"?`,
-                      onAction: () => del.mutate(r.id),
-                      actionVariant: "destructive",
-                    })
-                  }
-                >
-                  ลบ
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <DataTable<RoleListItem>
+        columns={columns}
+        dataSource={roles.data?.data ?? []}
+        loading={roles.isLoading}
+        rowKey="id"
+        className="flex-1 min-h-0"
+      />
 
       <CreateRoleDialog open={createOpen} onOpenChange={setCreateOpen} />
       <RolePermissionDialog
         editingId={editingId}
-        onOpenChange={(o) => {
-          if (!o) setEditingId(null);
-        }}
+        onOpenChange={(o) => { if (!o) setEditingId(null); }}
       />
       {AlertDialogComponent}
     </div>

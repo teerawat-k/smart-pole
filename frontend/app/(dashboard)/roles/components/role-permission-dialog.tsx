@@ -81,24 +81,24 @@ export function RolePermissionDialog({ editingId, onOpenChange }: Props) {
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>
-            จัดการ Permission — {role.data?.description || role.data?.name || "..."}
+            จัดการสิทธิ์ — {role.data?.description || role.data?.name || "..."}
           </DialogTitle>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto space-y-4 -mx-6 px-6">
           {grouped.map((cat) => (
             <div key={cat.key} className="space-y-2">
-              <h3 className="text-sm font-bold text-[#0D47A1] sticky top-0 bg-background py-1 border-b">
+              <h3 className="text-sm font-bold text-primary-dark sticky top-0 bg-background py-1 border-b">
                 {cat.label}
               </h3>
               <table className="w-full text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr>
-                    <th className="text-left py-1 pl-2">Module</th>
-                    <th className="text-center w-20">View</th>
-                    <th className="text-center w-20">Create</th>
-                    <th className="text-center w-20">Edit</th>
-                    <th className="text-center w-20">Delete</th>
-                    <th className="text-center w-20">Export</th>
+                    <th className="text-left py-1 pl-2">โมดูล</th>
+                    <th className="text-center w-20">ดู</th>
+                    <th className="text-center w-20">สร้าง</th>
+                    <th className="text-center w-20">แก้ไข</th>
+                    <th className="text-center w-20">ลบ</th>
+                    <th className="text-center w-20">ส่งออก</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -131,7 +131,7 @@ export function RolePermissionDialog({ editingId, onOpenChange }: Props) {
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             ยกเลิก
           </Button>
-          <Button onClick={submit} disabled={update.isPending} className="bg-[#1565C0]">
+          <Button onClick={submit} disabled={update.isPending}>
             {update.isPending ? "กำลังบันทึก..." : `บันทึก (${selected.size} รายการ)`}
           </Button>
         </DialogFooter>

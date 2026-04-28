@@ -4,12 +4,15 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { AppSider } from "@/components/layout/app-sider";
+import { AppHeader } from "@/components/layout/app-header";
 import { MeLoader } from "@/components/shared/me-loader";
+import { useRouteGuard } from "@/hooks/use-route-guard";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
+  useRouteGuard();
 
   useEffect(() => {
     if (hasHydrated && !isAuthenticated) {
@@ -19,18 +22,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!hasHydrated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F0F7FF]">
-        <div className="text-[#4A90A4] text-sm">กำลังโหลด...</div>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-brand-muted text-sm">กำลังโหลด...</div>
       </div>
     );
   }
   if (!isAuthenticated) return null;
 
   return (
-    <div className="flex min-h-screen bg-[#F0F7FF]">
+    <div className="h-screen flex flex-col bg-white">
       <MeLoader />
-      <AppSider />
-      <main className="flex-1 flex flex-col overflow-hidden w-full pt-12 md:pt-0">{children}</main>
+      <AppHeader />
+      <div className="flex flex-1 overflow-hidden">
+        <AppSider />
+        <main className="flex-1 overflow-hidden bg-white">{children}</main>
+      </div>
     </div>
   );
 }
