@@ -8,7 +8,6 @@ import { DataTable } from "@/components/layout/data-table";
 import type { Column, SortState } from "@/components/layout/data-table";
 import { usePoleLookup } from "@/hooks/api/use-poles";
 import { useSensorHistory } from "@/hooks/api/use-sensors";
-import { usePermission } from "@/hooks/use-permission";
 import { formatDateTime } from "@/lib/format";
 import { Download } from "lucide-react";
 import type { SensorReadingRow } from "@/lib/api/sensor";
@@ -36,8 +35,6 @@ export default function SensorPage() {
     sortBy:    sort?.column,
     sortOrder: sort?.direction,
   });
-  const { hasPermission } = usePermission();
-  const canExport = hasPermission("sensor_archive:export");
 
   const handleSort = (column: string, direction: "asc" | "desc" | null) => {
     if (!SORT_WHITELIST.has(column)) return;
@@ -151,17 +148,15 @@ export default function SensorPage() {
           />
         </div>
         <div className="flex-1" />
-        {canExport && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportCsv}
-            disabled={!history.data?.data.length}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            ส่งออก CSV
-          </Button>
-        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExportCsv}
+          disabled={!history.data?.data.length}
+        >
+          <Download className="mr-2 h-4 w-4" />
+          ส่งออก CSV
+        </Button>
       </div>
 
       <DataTable<SensorReadingRow>
