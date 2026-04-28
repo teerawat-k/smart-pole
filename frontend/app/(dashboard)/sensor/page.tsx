@@ -1,180 +1,179 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppCombobox } from "@/components/layout/app-combobox";
+import { DataTable } from "@/components/layout/data-table";
+import type { Column, SortState } from "@/components/layout/data-table";
 import { usePoleLookup } from "@/hooks/api/use-poles";
-import { useSensorTypes, useSensorHistory } from "@/hooks/api/use-sensors";
-import { Download, Search } from "lucide-react";
+import { useSensorHistory } from "@/hooks/api/use-sensors";
+import { formatDateTime } from "@/lib/format";
+import { Download } from "lucide-react";
+import type { SensorReadingRow } from "@/lib/api/sensor";
+
+const SORT_WHITELIST = new Set(["seq", "ingestedAt", "pm25", "temperature", "humidity"]);
 
 export default function SensorPage() {
   const poleLookup = usePoleLookup();
-  const sensorTypes = useSensorTypes();
-
   const [poleId, setPoleId] = useState<number | null>(null);
-  const [sensorKey, setSensorKey] = useState<string>("pm25");
-  const [from, setFrom] = useState(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.toISOString().slice(0, 16);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [sort, setSort] = useState<SortState | undefined>({ column: "seq", direction: "desc" });
+
+  useEffect(() => {
+    if (poleId === null && poleLookup.data && poleLookup.data.length > 0) {
+      setPoleId(poleLookup.data[0]!.id);
+    }
+  }, [poleLookup.data, poleId]);
+
+  useEffect(() => { setPage(1); }, [poleId]);
+
+  const history = useSensorHistory(poleId, {
+    page,
+    limit,
+    sortBy:    sort?.column,
+    sortOrder: sort?.direction,
   });
-  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 16));
-  const [search, setSearch] = useState(false);
 
-  const range = useMemo(() => (search ? { from: new Date(from), to: new Date(to) } : null), [search, from, to]);
+  const handleSort = (column: string, direction: "asc" | "desc" | null) => {
+    if (!SORT_WHITELIST.has(column)) return;
+    setSort(direction ? { column, direction } : undefined);
+    setPage(1);
+  };
 
-  const history = useSensorHistory(poleId, sensorKey, range);
+  const poleOptions = useMemo(
+    () => (poleLookup.data ?? []).map((p) => ({ id: p.id, label: p.poleName })),
+    [poleLookup.data],
+  );
+
+  const columns = useMemo<Column<SensorReadingRow>[]>(() => [
+    {
+      title: "ลำดับ",
+      dataIndex: "seq",
+      sorter: true,
+      width: 100,
+      render: (r) => <span className="font-medium">{r.seq}</span>,
+    },
+    {
+      title: "เวลาที่บันทึก",
+      dataIndex: "ingestedAt",
+      sorter: true,
+      width: 220,
+      render: (r) => <span>{formatDateTime(r.ingestedAt)}</span>,
+    },
+    {
+      title: "PM2.5",
+      dataIndex: "pm25",
+      sorter: true,
+      width: 140,
+      render: (r) =>
+        r.pm25 !== null ? (
+          <span>
+            {Number(r.pm25).toFixed(2)} <span className="text-xs text-muted-foreground">µg/m³</span>
+          </span>
+        ) : <span className="text-muted-foreground">—</span>,
+    },
+    {
+      title: "อุณหภูมิ",
+      dataIndex: "temperature",
+      sorter: true,
+      width: 140,
+      render: (r) =>
+        r.temperature !== null ? (
+          <span>
+            {Number(r.temperature).toFixed(2)} <span className="text-xs text-muted-foreground">°C</span>
+          </span>
+        ) : <span className="text-muted-foreground">—</span>,
+    },
+    {
+      title: "ความชื้น",
+      dataIndex: "humidity",
+      sorter: true,
+      width: 140,
+      render: (r) =>
+        r.humidity !== null ? (
+          <span>
+            {Number(r.humidity).toFixed(2)} <span className="text-xs text-muted-foreground">%RH</span>
+          </span>
+        ) : <span className="text-muted-foreground">—</span>,
+    },
+  ], []);
 
   const handleExportCsv = () => {
     if (!history.data?.data || history.data.data.length === 0) return;
-    const rows = history.data.data as Array<Record<string, unknown>>;
-    const keys = Object.keys(rows[0] ?? {});
-    const header = keys.join(",");
+    const rows = history.data.data;
+    const header = ["ลำดับ", "เวลาบันทึก", "PM2.5 (µg/m³)", "อุณหภูมิ (°C)", "ความชื้น (%RH)"];
     const lines = rows.map((r) =>
-      keys
-        .map((k) => {
-          const v = r[k];
-          if (v === null || v === undefined) return "";
-          if (v instanceof Date) return v.toISOString();
-          return String(v);
-        })
-        .join(","),
+      [
+        r.seq,
+        formatDateTime(r.ingestedAt),
+        r.pm25 ?? "",
+        r.temperature ?? "",
+        r.humidity ?? "",
+      ].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","),
     );
-    const csv = "﻿" + [header, ...lines].join("\n");
+    const csv = "﻿" + [header.join(","), ...lines].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sensor-${sensorKey}-${poleId}-${Date.now()}.csv`;
+    a.download = `sensor-${poleId}-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
+  const selectedPoleName = poleOptions.find((p) => p.id === poleId)?.label ?? "";
+
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-[#0D47A1]">ข้อมูล Sensor</h1>
-        <p className="text-sm text-[#4A90A4]">ค้นประวัติค่าจาก sensor บนเสาสัญญาณ</p>
+    <div className="p-4 md:p-6 flex flex-col gap-4 h-full overflow-hidden">
+      <div className="shrink-0">
+        <h1 className="text-2xl font-bold text-primary-dark">ข้อมูลเซนเซอร์</h1>
+        <p className="text-sm text-brand-muted">
+          ประวัติค่าจากเซนเซอร์บนเสาสัญญาณ
+          {selectedPoleName && ` · ${selectedPoleName}`}
+          {history.data?.total !== undefined && ` · ทั้งหมด ${history.data.total.toLocaleString()} รายการ`}
+        </p>
       </div>
 
-      <Card>
-        <CardContent className="pt-6">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setSearch(true);
-            }}
-            className="grid grid-cols-1 md:grid-cols-5 gap-3"
-          >
-            <div className="space-y-1">
-              <Label className="text-xs">เสา</Label>
-              <Select value={poleId ? String(poleId) : ""} onValueChange={(v) => setPoleId(Number(v))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="-- เลือกเสา --" />
-                </SelectTrigger>
-                <SelectContent>
-                  {poleLookup.data?.map((p) => (
-                    <SelectItem key={p.id} value={String(p.id)}>
-                      {p.poleName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Sensor</Label>
-              <Select value={sensorKey} onValueChange={setSensorKey}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {sensorTypes.data?.map((s) => (
-                    <SelectItem key={s.key} value={s.key}>
-                      {s.displayName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">ตั้งแต่</Label>
-              <Input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">ถึง</Label>
-              <Input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} />
-            </div>
-            <div className="flex items-end">
-              <Button type="submit" disabled={!poleId} className="w-full bg-[#1565C0]">
-                <Search className="mr-2 h-4 w-4" />
-                ค้นหา
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+      <div className="flex items-end gap-3 shrink-0">
+        <div className="space-y-1 w-72">
+          <Label className="text-xs">เสาสัญญาณ</Label>
+          <AppCombobox
+            className="w-full"
+            options={poleOptions}
+            value={poleId}
+            onChange={(v) => setPoleId(Number(v))}
+            required
+          />
+        </div>
+        <div className="flex-1" />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExportCsv}
+          disabled={!history.data?.data.length}
+        >
+          <Download className="mr-2 h-4 w-4" />
+          ส่งออก CSV
+        </Button>
+      </div>
 
-      {search && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">ผลการค้นหา ({history.data?.total ?? 0} รายการ)</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportCsv}
-              disabled={!history.data?.data.length}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export CSV
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {history.isLoading ? (
-              <div className="p-8 text-center text-muted-foreground">กำลังโหลด...</div>
-            ) : !history.data || history.data.total === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">ไม่พบข้อมูล</div>
-            ) : (
-              <div className="overflow-x-auto max-h-[600px]">
-                <table className="w-full text-sm">
-                  <thead className="bg-[#F0F7FF] sticky top-0 border-b">
-                    <tr>
-                      {Object.keys(history.data.data[0] as Record<string, unknown>).map((k) => (
-                        <th key={k} className="px-3 py-2 text-left font-medium">
-                          {k}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(history.data.data as Array<Record<string, unknown>>).map((row, i) => (
-                      <tr key={i} className="border-b">
-                        {Object.keys(row).map((k) => (
-                          <td key={k} className="px-3 py-1.5">
-                            {row[k] === null || row[k] === undefined
-                              ? "—"
-                              : typeof row[k] === "string" && k === "time"
-                                ? new Date(row[k] as string).toLocaleString("th-TH")
-                                : String(row[k])}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <DataTable<SensorReadingRow>
+        columns={columns}
+        dataSource={history.data?.data ?? []}
+        loading={history.isLoading}
+        rowKey="id"
+        sort={sort}
+        onSort={handleSort}
+        className="flex-1 min-h-0"
+        pagination={{
+          current: page,
+          limit,
+          total: history.data?.total ?? 0,
+          onChange: (p, l) => { setPage(p); setLimit(l); },
+        }}
+      />
     </div>
   );
 }

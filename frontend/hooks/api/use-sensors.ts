@@ -1,11 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { sensorApi } from "@/lib/api/sensor";
-
-export function useSensorTypes() {
-  return useQuery({ queryKey: ["sensor-type", "list"], queryFn: () => sensorApi.types() });
-}
+import { keepPreviousData } from "@tanstack/react-query";
+import { sensorApi, type SensorHistoryParams } from "@/lib/api/sensor";
 
 export function useSensorLatest(poleId: number | null, opts?: { refetchIntervalMs?: number }) {
   return useQuery({
@@ -16,18 +13,11 @@ export function useSensorLatest(poleId: number | null, opts?: { refetchIntervalM
   });
 }
 
-export function useSensorHistory(
-  poleId: number | null,
-  sensorKey: string,
-  range: { from: Date; to: Date } | null,
-) {
+export function useSensorHistory(poleId: number | null, params: SensorHistoryParams) {
   return useQuery({
-    queryKey: ["sensor", "history", poleId, sensorKey, range?.from.toISOString(), range?.to.toISOString()],
-    queryFn: () =>
-      sensorApi.history(poleId!, sensorKey, {
-        from: range!.from.toISOString(),
-        to: range!.to.toISOString(),
-      }),
-    enabled: poleId !== null && range !== null,
+    queryKey: ["sensor", "history", poleId, params],
+    queryFn: () => sensorApi.history(poleId!, params),
+    enabled: poleId !== null,
+    placeholderData: keepPreviousData,
   });
 }

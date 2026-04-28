@@ -45,6 +45,8 @@ export interface PoleLookupItem {
   hasCamera: boolean;
   hasPm25Sensor: boolean;
   hasTempHumidity: boolean;
+  poleStatus: PoleStatus;
+  lastSeenAt: string | null;
 }
 
 export interface PoleListParams extends ListParams {
