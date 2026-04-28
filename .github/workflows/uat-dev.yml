@@ -115,7 +115,9 @@ jobs:
             set -e
 
             export IMAGE_TAG="${{ env.IMAGE_TAG }}"
-            cd "${{ secrets.COMPOSE_PATH }}"
+            export DEPLOY_DIR="${{ secrets.COMPOSE_PATH }}"
+            mkdir -p "$DEPLOY_DIR"
+            cd "$DEPLOY_DIR"
 
             echo "📝 Creating .env file from secrets..."
             cat > .env << EOF
@@ -155,23 +157,18 @@ jobs:
             docker network create smart-pole-network 2>/dev/null || true
 
             echo "📂 Fixing permissions for volumes..."
-            docker run --rm -v "$(pwd)/data:/data" alpine sh -c "mkdir -p /data/uploads /data/recordings /data/mosquitto/data /data/mosquitto/log && chmod -R 777 /data" || true
+            mkdir -p data/uploads data/recordings data/mosquitto/data data/mosquitto/log
+            chmod -R 777 data 2>/dev/null || true
 
             # ─── Mosquitto: bootstrap password file (idempotent) ─────────────
             echo "🔐 Bootstrap Mosquitto credentials..."
             mkdir -p infra/mosquitto/config
-            if [ ! -f infra/mosquitto/config/passwordfile ]; then
-              docker run --rm -v "$(pwd)/infra/mosquitto/config:/mosquitto/config" \
-                eclipse-mosquitto:2 mosquitto_passwd -b -c /mosquitto/config/passwordfile \
-                "${{ secrets.MQTT_USERNAME }}" "${{ secrets.MQTT_PASSWORD }}"
-              chmod 0700 infra/mosquitto/config/passwordfile
-              echo "  ↳ password file created"
-            else
-              docker run --rm -v "$(pwd)/infra/mosquitto/config:/mosquitto/config" \
-                eclipse-mosquitto:2 mosquitto_passwd -b /mosquitto/config/passwordfile \
-                "${{ secrets.MQTT_USERNAME }}" "${{ secrets.MQTT_PASSWORD }}"
-              echo "  ↳ password file updated"
-            fi
+            MOSQ_FLAG=""
+            [ ! -f infra/mosquitto/config/passwordfile ] && MOSQ_FLAG="-c"
+            docker run --rm -v "$DEPLOY_DIR/infra/mosquitto/config:/mosquitto/config" \
+              eclipse-mosquitto:2 mosquitto_passwd -b $MOSQ_FLAG /mosquitto/config/passwordfile \
+              "${{ secrets.MQTT_USERNAME }}" "${{ secrets.MQTT_PASSWORD }}"
+            chmod 0700 infra/mosquitto/config/passwordfile
 
             # ─── Mosquitto + SRS: ensure running + reload config ────────────
             echo "🦟 Ensuring Mosquitto running..."
@@ -313,8 +310,14 @@ jobs:
             export IMAGE_TAG="${{ env.IMAGE_TAG }}"
             export DOCKERHUB_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
             export FRONTEND_PORT="${{ vars.FRONTEND_PORT || 7765 }}"
+            export DEPLOY_DIR="${{ secrets.COMPOSE_PATH }}"
+            mkdir -p "$DEPLOY_DIR"
+            cd "$DEPLOY_DIR"
 
-            cd "${{ secrets.COMPOSE_PATH }}"
+            # docker compose ต้องการ env_file ของทุก service — ถ้า backend job ยังไม่รัน
+            # ต้อง stub ก่อน (frontend container ไม่ใช้ค่าใน backend/.env)
+            mkdir -p backend
+            [ ! -f backend/.env ] && touch backend/.env
 
             echo "🔑 Logging into Docker Hub..."
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
