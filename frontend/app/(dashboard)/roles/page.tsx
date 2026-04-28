@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Plus, Settings2, Trash2 } from "lucide-react";
 import { useRoles, useDeleteRole } from "@/hooks/api/use-roles";
 import { useAppAlertDialog } from "@/hooks/use-app-alert-dialog";
+import { usePermission } from "@/hooks/use-permission";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/layout/data-table";
@@ -21,6 +22,11 @@ export default function RolesPage() {
   const del = useDeleteRole();
   const { confirm, AlertDialogComponent } = useAppAlertDialog();
   const { sorted, sort, onSort } = useClientSort(roles.data?.data ?? []);
+  const { hasPermission } = usePermission();
+  const canCreate = hasPermission("role:create");
+  const canEdit   = hasPermission("role:edit");
+  const canDelete = hasPermission("role:delete");
+  const canRowAction = canEdit || canDelete;
 
   const columns = useMemo<Column<RoleListItem>[]>(() => [
     {
