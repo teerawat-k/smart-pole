@@ -56,10 +56,10 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl border-sidebar-border">
         <CardHeader className="text-center space-y-2">
           <div className="flex justify-center">
-            <Image src="/logo.png" alt="Smart Pole" width={64} height={64} priority />
+            <Image src="/logo.png" alt="Smart Pole" width={100} height={100} priority />
           </div>
-          <CardTitle className="text-2xl font-bold text-primary-dark">Smart Pole</CardTitle>
-          <p className="text-sm text-brand-muted">ระบบเฝ้าระวังเสาสัญญาณอัจฉริยะ</p>
+          <CardTitle className="text-2xl font-bold text-primary-dark">Smart Pole Management</CardTitle>
+          <p className="text-sm text-brand-muted">ระบบบริหารเสาอัจฉริยะ</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
