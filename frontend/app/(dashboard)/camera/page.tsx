@@ -2,21 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Play, Video } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Video } from "lucide-react";
 import { AppCombobox } from "@/components/layout/app-combobox";
-import { DataTable } from "@/components/layout/data-table";
-import type { Column } from "@/components/layout/data-table";
 import { usePoleLookup } from "@/hooks/api/use-poles";
 import { useClipDates, useClipList } from "@/hooks/api/use-camera-clips";
 import { cameraClipApi, type ClipItem } from "@/lib/api/camera-clip";
 import { formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 function formatBytes(b: number): string {
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
@@ -28,7 +20,7 @@ export default function CameraPage() {
   const poleLookup = usePoleLookup();
   const [poleId, setPoleId] = useState<number | null>(null);
   const [date, setDate] = useState<string | null>(null);
-  const [playing, setPlaying] = useState<{ filename: string; url: string } | null>(null);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
   const cameraPoles = useMemo(
     () => (poleLookup.data ?? []).filter((p) => p.hasCamera),
@@ -50,10 +42,23 @@ export default function CameraPage() {
     }
   }, [dates.data, date]);
 
-  // เปลี่ยนเสา → reset วันที่
+  // เปลี่ยนเสา → reset วันที่ + ไฟล์
   useEffect(() => {
     setDate(null);
+    setSelectedFile(null);
   }, [poleId]);
+
+  // เปลี่ยนวันที่ → reset ไฟล์
+  useEffect(() => {
+    setSelectedFile(null);
+  }, [date]);
+
+  // clips โหลดมา → เลือกไฟล์ใหม่สุดอัตโนมัติ
+  useEffect(() => {
+    if (clips.data && clips.data.length > 0 && selectedFile === null) {
+      setSelectedFile(clips.data[0]!.filename);
+    }
+  }, [clips.data, selectedFile]);
 
   const poleOptions = useMemo(
     () => cameraPoles.map((p) => ({ id: p.id, label: p.poleName })),
@@ -65,48 +70,20 @@ export default function CameraPage() {
     [dates.data],
   );
 
-  const handlePlay = (clip: ClipItem) => {
-    if (!selectedPole || !date) return;
-    const url = cameraClipApi.buildStreamUrl(selectedPole.poleName, date, clip.filename);
-    setPlaying({ filename: clip.filename, url });
-  };
+  const currentClip = useMemo(
+    () => clips.data?.find((c) => c.filename === selectedFile) ?? null,
+    [clips.data, selectedFile],
+  );
 
-  const columns = useMemo<Column<ClipItem>[]>(() => [
-    {
-      title: "ไฟล์",
-      dataIndex: "filename",
-      render: (r) => <span className="font-medium">{r.filename}</span>,
-    },
-    {
-      title: "ขนาด",
-      dataIndex: "sizeBytes",
-      width: 120,
-      render: (r) => formatBytes(r.sizeBytes),
-    },
-    {
-      title: "เวลาบันทึก",
-      dataIndex: "modifiedAt",
-      width: 200,
-      render: (r) => <span className="text-xs text-muted-foreground">{formatDateTime(r.modifiedAt)}</span>,
-    },
-    {
-      title: "",
-      key: "actions",
-      width: "fit",
-      fixed: "right",
-      render: (r) => (
-        <Button size="sm" variant="ghost" onClick={() => handlePlay(r)}>
-          <Play className="mr-1 h-3.5 w-3.5" />เล่น
-        </Button>
-      ),
-    },
-  ], [selectedPole, date]);
+  const playUrl = selectedPole && date && selectedFile
+    ? cameraClipApi.buildStreamUrl(selectedPole.poleName, date, selectedFile)
+    : null;
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-4 h-full overflow-hidden">
       <div className="shrink-0">
         <h1 className="text-2xl font-bold text-primary-dark">บันทึกกล้อง</h1>
-        <p className="text-sm text-brand-muted">เลือกเสาและวันที่เพื่อดูคลิปที่ถูกบันทึก</p>
+        <p className="text-sm text-brand-muted">เลือกเสาและวันที่ จากนั้นเลือกไฟล์ทางซ้ายเพื่อเปิดดู</p>
       </div>
 
       <div className="shrink-0 grid grid-cols-1 md:grid-cols-3 gap-3 p-4 rounded-lg border bg-card">
@@ -128,7 +105,7 @@ export default function CameraPage() {
             value={date}
             onChange={(v) => setDate(String(v))}
             required
-            disabled={!selectedPole || dates.isLoading}
+            disabled={!selectedPole || dates.isLoading || dateOptions.length === 0}
           />
         </div>
       </div>
@@ -140,26 +117,96 @@ export default function CameraPage() {
       ) : !date ? (
         <EmptyState text="กรุณาเลือกวันที่" />
       ) : (
-        <DataTable<ClipItem>
-          columns={columns}
-          dataSource={clips.data ?? []}
-          loading={clips.isLoading}
-          rowKey="filename"
-          className="flex-1 min-h-0"
-          emptyText="ไม่พบคลิปในวันที่เลือก"
-        />
-      )}
+        <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4">
+          {/* ── File list panel ── */}
+          <ClipListPanel
+            clips={clips.data ?? []}
+            loading={clips.isLoading}
+            selectedFile={selectedFile}
+            onSelect={setSelectedFile}
+          />
 
-      <Dialog open={!!playing} onOpenChange={(o) => { if (!o) setPlaying(null); }}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>{playing?.filename}</DialogTitle>
-          </DialogHeader>
-          {playing && (
-            <video src={playing.url} controls autoPlay className="w-full rounded bg-black" />
-          )}
-        </DialogContent>
-      </Dialog>
+          {/* ── Video player panel ── */}
+          <div className="flex flex-col gap-3 min-h-0">
+            <div className="flex-1 min-h-0 bg-black rounded-md overflow-hidden flex items-center justify-center">
+              {playUrl ? (
+                <video
+                  key={playUrl}
+                  src={playUrl}
+                  controls
+                  autoPlay
+                  className="w-full h-full"
+                />
+              ) : (
+                <div className="flex flex-col items-center text-gray-400">
+                  <Video className="h-10 w-10 mb-2" />
+                  เลือกไฟล์ที่ต้องการดู
+                </div>
+              )}
+            </div>
+            {currentClip && (
+              <div className="shrink-0 px-3 py-2 rounded-md border bg-card text-sm">
+                <div className="font-medium">{currentClip.filename}</div>
+                <div className="text-xs text-muted-foreground">
+                  {formatBytes(currentClip.sizeBytes)} · บันทึกเมื่อ {formatDateTime(currentClip.modifiedAt)}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClipListPanel({
+  clips,
+  loading,
+  selectedFile,
+  onSelect,
+}: {
+  clips: ClipItem[];
+  loading: boolean;
+  selectedFile: string | null;
+  onSelect: (filename: string) => void;
+}) {
+  return (
+    <div className="flex flex-col rounded-md border bg-card min-h-0">
+      <div className="shrink-0 px-3 py-2 border-b text-xs font-medium text-muted-foreground">
+        รายชื่อไฟล์ ({clips.length})
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="p-4 text-center text-sm text-muted-foreground">กำลังโหลด...</div>
+        ) : clips.length === 0 ? (
+          <div className="p-4 text-center text-sm text-muted-foreground">ไม่พบคลิปในวันที่เลือก</div>
+        ) : (
+          <ul className="divide-y">
+            {clips.map((c) => {
+              const active = c.filename === selectedFile;
+              return (
+                <li key={c.filename}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(c.filename)}
+                    className={cn(
+                      "w-full text-left px-3 py-2 text-sm transition-colors",
+                      active
+                        ? "bg-primary/10 text-primary-dark font-medium"
+                        : "hover:bg-muted/50",
+                    )}
+                  >
+                    <div className="truncate">{c.filename}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      {formatBytes(c.sizeBytes)} · {formatDateTime(c.modifiedAt)}
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
