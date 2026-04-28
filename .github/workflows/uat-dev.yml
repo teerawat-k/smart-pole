@@ -114,8 +114,8 @@ jobs:
           script: |
             set -e
 
-            export IMAGE_TAG=${{ env.IMAGE_TAG }}
-            cd ${{ secrets.COMPOSE_PATH }}
+            export IMAGE_TAG="${{ env.IMAGE_TAG }}"
+            cd "${{ secrets.COMPOSE_PATH }}"
 
             echo "📝 Creating .env file from secrets..."
             cat > .env << EOF
@@ -310,11 +310,11 @@ jobs:
           script: |
             set -e
 
-            export IMAGE_TAG=${{ env.IMAGE_TAG }}
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-            export FRONTEND_PORT=${{ vars.FRONTEND_PORT || 7765 }}
+            export IMAGE_TAG="${{ env.IMAGE_TAG }}"
+            export DOCKERHUB_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
+            export FRONTEND_PORT="${{ vars.FRONTEND_PORT || 7765 }}"
 
-            cd ${{ secrets.COMPOSE_PATH }}
+            cd "${{ secrets.COMPOSE_PATH }}"
 
             echo "🔑 Logging into Docker Hub..."
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin

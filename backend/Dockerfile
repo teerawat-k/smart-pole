@@ -5,7 +5,7 @@ WORKDIR /app
 # ── Dependencies (cached layer) ───────────────────────────
 FROM base AS deps
 COPY package.json bun.lock* ./
-RUN bun install --frozen-lockfile --production=false
+RUN bun install --frozen-lockfile
 
 # ── Build (Prisma generate) ───────────────────────────────
 FROM base AS builder
