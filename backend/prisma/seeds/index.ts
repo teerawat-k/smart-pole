@@ -4,14 +4,14 @@ import { prisma } from "@/plugins/prisma";
 import { seedPermissions } from "./permissions";
 import { seedRoles } from "./roles";
 import { seedUsers } from "./users";
-import { seedSensorTypes } from "./sensor-types";
+import { seedPoles } from "./poles";
 
 async function main() {
   console.log("🌱 Seeding...");
   await seedPermissions();
   await seedRoles();
   await seedUsers();
-  await seedSensorTypes();
+  await seedPoles();
   console.log("✅ Seed completed");
 }
 

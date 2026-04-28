@@ -12,8 +12,6 @@ const DEFAULT_ADMIN = {
   password: "12345",
 };
 
-const SEED_USER_ID = 0;
-
 export async function seedUsers(): Promise<void> {
   const adminRole = await prisma.role.findUnique({ where: { name: "admin" } });
   if (!adminRole) throw new Error("admin role missing — run seedRoles first");
@@ -23,7 +21,6 @@ export async function seedUsers(): Promise<void> {
   const user = await prisma.user.upsert({
     where: { username: DEFAULT_ADMIN.username },
     update: {
-      // re-hash password ทุก seed (กัน hash format เปลี่ยนระหว่าง dev)
       password: passwordHash,
       roleId: adminRole.id,
       status: "active",
@@ -40,7 +37,7 @@ export async function seedUsers(): Promise<void> {
       password: passwordHash,
       roleId: adminRole.id,
       status: "active",
-      createdBy: SEED_USER_ID,
+      // createdBy = null (initial admin)
     },
   });
   console.log(`✅ Admin upserted: ${user.username} / ${DEFAULT_ADMIN.password} (id=${user.id})`);
