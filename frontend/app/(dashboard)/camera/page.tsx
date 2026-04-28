@@ -8,15 +8,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Play, Video } from "lucide-react";
+import { Play, Upload, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppCombobox } from "@/components/layout/app-combobox";
 import { DataTable } from "@/components/layout/data-table";
 import type { Column } from "@/components/layout/data-table";
 import { usePoleLookup } from "@/hooks/api/use-poles";
 import { useClipDates, useClipList } from "@/hooks/api/use-camera-clips";
+import { usePermission } from "@/hooks/use-permission";
 import { cameraClipApi, type ClipItem } from "@/lib/api/camera-clip";
 import { formatDateTime } from "@/lib/format";
+import { UploadClipDialog } from "./components/upload-clip-dialog";
 
 function formatBytes(b: number): string {
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
@@ -29,6 +31,9 @@ export default function CameraPage() {
   const [poleId, setPoleId] = useState<number | null>(null);
   const [date, setDate] = useState<string | null>(null);
   const [playing, setPlaying] = useState<{ filename: string; url: string } | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const { hasPermission } = usePermission();
+  const canUpload = hasPermission("camera_archive:create");
 
   const cameraPoles = useMemo(
     () => (poleLookup.data ?? []).filter((p) => p.hasCamera),
@@ -104,9 +109,17 @@ export default function CameraPage() {
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-4 h-full overflow-hidden">
-      <div className="shrink-0">
-        <h1 className="text-2xl font-bold text-primary-dark">บันทึกกล้อง</h1>
-        <p className="text-sm text-brand-muted">เลือกเสาและวันที่เพื่อดูคลิปที่ถูกบันทึก</p>
+      <div className="flex items-center justify-between flex-wrap gap-2 shrink-0">
+        <div>
+          <h1 className="text-2xl font-bold text-primary-dark">บันทึกกล้อง</h1>
+          <p className="text-sm text-brand-muted">เลือกเสาและวันที่เพื่อดูคลิปที่ถูกบันทึก</p>
+        </div>
+        {canUpload && (
+          <Button onClick={() => setUploadOpen(true)} disabled={!selectedPole}>
+            <Upload className="mr-2 h-4 w-4" />
+            อัปโหลดคลิป
+          </Button>
+        )}
       </div>
 
       <div className="shrink-0 grid grid-cols-1 md:grid-cols-3 gap-3 p-4 rounded-lg border bg-card">
@@ -160,6 +173,16 @@ export default function CameraPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {selectedPole && (
+        <UploadClipDialog
+          open={uploadOpen}
+          onOpenChange={setUploadOpen}
+          poleName={selectedPole.poleName}
+          defaultDate={date ?? undefined}
+          onUploaded={(d) => setDate(d)}
+        />
+      )}
     </div>
   );
 }

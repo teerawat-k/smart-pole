@@ -18,7 +18,7 @@ interface PermissionSeed {
 const PERMISSIONS: PermissionSeed[] = [
   // ── Monitoring ──
   ...buildModule("dashboard",      "Monitoring", "monitoring", "แดชบอร์ด",         ["view"]),
-  ...buildModule("camera_archive", "Monitoring", "monitoring", "บันทึกกล้อง",      ["view"]),
+  ...buildModule("camera_archive", "Monitoring", "monitoring", "บันทึกกล้อง",      ["view", "create"]),
   ...buildModule("sensor_archive", "Monitoring", "monitoring", "ข้อมูลเซนเซอร์",   ["view"]),
 
   // ── Master ──
