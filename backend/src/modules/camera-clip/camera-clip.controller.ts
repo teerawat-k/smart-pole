@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
 import { cameraClipService } from "./camera-clip.service";
-import { CAMERA_CLIP_MIME, CAMERA_CLIP_MAX_BYTES } from "./camera-clip.constants";
+import { CAMERA_CLIP_MIME } from "./camera-clip.constants";
 
 export const cameraClipController = new Elysia({ prefix: "/api/cameras" })
   .get(
@@ -69,24 +69,6 @@ export const cameraClipController = new Elysia({ prefix: "/api/cameras" })
       query: t.Object({
         date: t.String({ minLength: 10, maxLength: 10 }),
         file: t.String({ minLength: 1, maxLength: 200 }),
-      }),
-    },
-  )
-  .post(
-    "/:poleName/upload",
-    async ({ params, body }) => {
-      const result = await cameraClipService.uploadClip({
-        poleName: params.poleName,
-        date: body.date,
-        file: body.file,
-      });
-      return { success: true, data: result, message: "อัปโหลดไฟล์สำเร็จ" };
-    },
-    {
-      params: t.Object({ poleName: t.String({ minLength: 1, maxLength: 100 }) }),
-      body: t.Object({
-        date: t.String({ minLength: 10, maxLength: 10 }),
-        file: t.File({ maxSize: CAMERA_CLIP_MAX_BYTES, type: CAMERA_CLIP_MIME }),
       }),
     },
   );

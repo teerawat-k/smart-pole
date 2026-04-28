@@ -53,9 +53,6 @@ export const ErrorCode = {
 
   // ── Camera clip ──
   CLIP_NOT_FOUND: "CLIP-001",
-  CLIP_INVALID_FILE: "CLIP-002",
-  CLIP_TOO_LARGE: "CLIP-003",
-  CLIP_DUPLICATE: "CLIP-004",
 
   // ── Alert ──
   ALERT_NOT_FOUND: "ALERT-001",

@@ -1,14 +1,9 @@
 import path from "node:path";
-import { readdir, stat, mkdir } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { env } from "@/config/env";
-import { NotFoundError, ValidationError, DuplicateError } from "@/common/errors";
+import { NotFoundError } from "@/common/errors";
 import { ErrorCode } from "@/common/errors/codes";
-import {
-  CAMERA_CLIP_DIR,
-  CAMERA_CLIP_EXT,
-  CAMERA_CLIP_MIME,
-  CAMERA_CLIP_MAX_BYTES,
-} from "./camera-clip.constants";
+import { CAMERA_CLIP_DIR, CAMERA_CLIP_EXT } from "./camera-clip.constants";
 
 // ── Validation guards (path traversal protection) ─────────
 const POLE_NAME_RE = /^[a-zA-Z0-9_-]+$/;
@@ -100,68 +95,7 @@ export const cameraClipService = {
     }
     return { fullPath, size: s.size };
   },
-
-  /**
-   * บันทึกไฟล์ที่ upload เข้า <UPLOAD_DIR>/camera/<poleName>/<date>/<sanitized>.mp4
-   * - ตรวจ MIME + extension + size
-   * - กัน path traversal ผ่าน sanitize
-   * - ห้าม overwrite ไฟล์เดิม
-   */
-  async uploadClip(input: {
-    poleName: string;
-    date: string;
-    file: File;
-  }): Promise<{ filename: string; sizeBytes: number }> {
-    assertPoleName(input.poleName);
-    assertDate(input.date);
-
-    if (input.file.size === 0) {
-      throw new ValidationError(ErrorCode.CLIP_INVALID_FILE, "ไฟล์ว่าง");
-    }
-    if (input.file.size > CAMERA_CLIP_MAX_BYTES) {
-      throw new ValidationError(
-        ErrorCode.CLIP_TOO_LARGE,
-        `ไฟล์ใหญ่เกิน ${Math.floor(CAMERA_CLIP_MAX_BYTES / 1024 / 1024)} MB`,
-      );
-    }
-    // browser อาจส่ง MIME ว่าง — ตรวจ extension เป็นหลัก, MIME รองถ้ามี
-    if (input.file.type && input.file.type !== CAMERA_CLIP_MIME) {
-      throw new ValidationError(ErrorCode.CLIP_INVALID_FILE, "รองรับเฉพาะไฟล์ MP4");
-    }
-    const original = input.file.name ?? "";
-    const sanitized = sanitizeClipFilename(original);
-    if (!sanitized) {
-      throw new ValidationError(ErrorCode.CLIP_INVALID_FILE, "ชื่อไฟล์ไม่ถูกต้อง — ต้องลงท้ายด้วย .mp4");
-    }
-
-    const dir = path.join(poleRoot(input.poleName), input.date);
-    const fullPath = path.join(dir, sanitized);
-
-    // กัน overwrite
-    const existing = await safeStat(fullPath);
-    if (existing) {
-      throw new DuplicateError(ErrorCode.CLIP_DUPLICATE, `มีไฟล์ชื่อ "${sanitized}" อยู่แล้ว`);
-    }
-
-    await mkdir(dir, { recursive: true });
-    await Bun.write(fullPath, input.file);
-
-    return { filename: sanitized, sizeBytes: input.file.size };
-  },
 };
-
-/** sanitize filename — strip path traversal + non-safe chars, บังคับ .mp4 */
-function sanitizeClipFilename(name: string): string | null {
-  const base = name
-    .replace(/[/\\]/g, "_")
-    .replace(/\.\./g, "_")
-    .replace(/[^\w.\-]/g, "_")
-    .slice(0, 200);
-  if (!base.toLowerCase().endsWith(CAMERA_CLIP_EXT)) return null;
-  // ห้ามชื่อขึ้นต้น . หรือว่าง
-  if (base.startsWith(".") || base === CAMERA_CLIP_EXT) return null;
-  return base;
-}
 
 async function safeReaddir(p: string): Promise<string[] | null> {
   try {
