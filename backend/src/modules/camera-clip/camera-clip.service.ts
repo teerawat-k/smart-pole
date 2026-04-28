@@ -30,11 +30,6 @@ function poleRoot(poleName: string): string {
   return path.join(env.UPLOAD_DIR, CAMERA_CLIP_DIR, poleName);
 }
 
-export interface ClipDate {
-  date: string;        // YYYY-MM-DD
-  fileCount: number;
-}
-
 export interface ClipItem {
   filename: string;    // เช่น "08-30-15.mp4"
   sizeBytes: number;
@@ -42,24 +37,6 @@ export interface ClipItem {
 }
 
 export const cameraClipService = {
-  /** คืนรายการวันที่ที่มีไฟล์ — sorted ใหม่ → เก่า */
-  async listDates(poleName: string): Promise<ClipDate[]> {
-    assertPoleName(poleName);
-    const root = poleRoot(poleName);
-    const entries = await safeReaddir(root);
-    if (!entries) return [];
-
-    const dates: ClipDate[] = [];
-    for (const entry of entries) {
-      if (!DATE_RE.test(entry)) continue;
-      const files = await safeReaddir(path.join(root, entry));
-      if (!files) continue;
-      const count = files.filter((f) => f.toLowerCase().endsWith(CAMERA_CLIP_EXT)).length;
-      if (count > 0) dates.push({ date: entry, fileCount: count });
-    }
-    return dates.sort((a, b) => b.date.localeCompare(a.date));
-  },
-
   /** คืนรายการไฟล์ใน folder วันที่ — sorted ใหม่ → เก่า ตาม mtime */
   async listClips(poleName: string, date: string): Promise<ClipItem[]> {
     assertPoleName(poleName);

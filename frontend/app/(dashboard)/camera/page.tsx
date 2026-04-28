@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Video } from "lucide-react";
 import { AppCombobox } from "@/components/layout/app-combobox";
+import { AppDatePicker } from "@/components/layout/app-date-picker";
 import { usePoleLookup } from "@/hooks/api/use-poles";
-import { useClipDates, useClipList } from "@/hooks/api/use-camera-clips";
+import { useClipList } from "@/hooks/api/use-camera-clips";
 import { cameraClipApi, type ClipItem } from "@/lib/api/camera-clip";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -16,10 +17,14 @@ function formatBytes(b: number): string {
   return `${(b / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function CameraPage() {
   const poleLookup = usePoleLookup();
   const [poleId, setPoleId] = useState<number | null>(null);
-  const [date, setDate] = useState<string | null>(null);
+  const [date, setDate] = useState<string>(todayISO);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
   const cameraPoles = useMemo(
@@ -32,26 +37,12 @@ export default function CameraPage() {
     [cameraPoles, poleId],
   );
 
-  const dates = useClipDates(selectedPole?.poleName ?? null);
   const clips = useClipList(selectedPole?.poleName ?? null, date);
 
-  // เลือกวันที่ใหม่สุดอัตโนมัติเมื่อ dates โหลดมา
-  useEffect(() => {
-    if (dates.data && dates.data.length > 0 && date === null) {
-      setDate(dates.data[0]!.date);
-    }
-  }, [dates.data, date]);
-
-  // เปลี่ยนเสา → reset วันที่ + ไฟล์
-  useEffect(() => {
-    setDate(null);
-    setSelectedFile(null);
-  }, [poleId]);
-
-  // เปลี่ยนวันที่ → reset ไฟล์
+  // เปลี่ยนเสา/วันที่ → reset ไฟล์ที่เลือก
   useEffect(() => {
     setSelectedFile(null);
-  }, [date]);
+  }, [poleId, date]);
 
   // clips โหลดมา → เลือกไฟล์ใหม่สุดอัตโนมัติ
   useEffect(() => {
@@ -65,17 +56,12 @@ export default function CameraPage() {
     [cameraPoles],
   );
 
-  const dateOptions = useMemo(
-    () => (dates.data ?? []).map((d) => ({ id: d.date, label: `${d.date} (${d.fileCount} คลิป)` })),
-    [dates.data],
-  );
-
   const currentClip = useMemo(
     () => clips.data?.find((c) => c.filename === selectedFile) ?? null,
     [clips.data, selectedFile],
   );
 
-  const playUrl = selectedPole && date && selectedFile
+  const playUrl = selectedPole && selectedFile
     ? cameraClipApi.buildStreamUrl(selectedPole.poleName, date, selectedFile)
     : null;
 
@@ -99,23 +85,16 @@ export default function CameraPage() {
         </div>
         <div className="space-y-1">
           <Label className="text-xs">วันที่</Label>
-          <AppCombobox
+          <AppDatePicker
             className="w-full"
-            options={dateOptions}
             value={date}
-            onChange={(v) => setDate(String(v))}
-            required
-            disabled={!selectedPole || dates.isLoading || dateOptions.length === 0}
+            onChange={setDate}
           />
         </div>
       </div>
 
       {!selectedPole ? (
         <EmptyState text="กรุณาเลือกเสา" />
-      ) : dates.data?.length === 0 ? (
-        <EmptyState text="ไม่พบคลิปสำหรับเสานี้" />
-      ) : !date ? (
-        <EmptyState text="กรุณาเลือกวันที่" />
       ) : (
         <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4">
           {/* ── File list panel ── */}
@@ -140,7 +119,9 @@ export default function CameraPage() {
               ) : (
                 <div className="flex flex-col items-center text-gray-400">
                   <Video className="h-10 w-10 mb-2" />
-                  เลือกไฟล์ที่ต้องการดู
+                  {clips.data && clips.data.length === 0
+                    ? "ไม่มีคลิปในวันที่เลือก"
+                    : "เลือกไฟล์ที่ต้องการดู"}
                 </div>
               )}
             </div>

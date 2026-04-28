@@ -4,14 +4,6 @@ import { CAMERA_CLIP_MIME } from "./camera-clip.constants";
 
 export const cameraClipController = new Elysia({ prefix: "/api/cameras" })
   .get(
-    "/:poleName/dates",
-    async ({ params }) => {
-      const data = await cameraClipService.listDates(params.poleName);
-      return { success: true, data };
-    },
-    { params: t.Object({ poleName: t.String({ minLength: 1, maxLength: 100 }) }) },
-  )
-  .get(
     "/:poleName/clips",
     async ({ params, query }) => {
       const data = await cameraClipService.listClips(params.poleName, query.date);

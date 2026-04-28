@@ -4,10 +4,11 @@ import { useState, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { AppCombobox } from "@/components/layout/app-combobox";
+import { AppDatePicker } from "@/components/layout/app-date-picker";
 import { Wifi, WifiOff, Wrench, Antenna, Video } from "lucide-react";
 import { usePoleLookup } from "@/hooks/api/use-poles";
 import { useSensorLatest } from "@/hooks/api/use-sensors";
-import { useClipDates, useClipList } from "@/hooks/api/use-camera-clips";
+import { useClipList } from "@/hooks/api/use-camera-clips";
 import { cameraClipApi } from "@/lib/api/camera-clip";
 import { env } from "@/config/env";
 import type { PoleStatus } from "@/lib/api/pole";
@@ -78,24 +79,15 @@ export default function DashboardPage() {
   );
 
   // ── Camera clip picker (date + file) ────────────────────
-  const [clipDate, setClipDate] = useState<string | null>(null);
+  const [clipDate, setClipDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [clipFile, setClipFile] = useState<string | null>(null);
 
-  const dates = useClipDates(selected?.hasCamera ? selected.poleName : null);
   const clips = useClipList(selected?.hasCamera ? selected.poleName : null, clipDate);
 
-  // เปลี่ยนเสา → reset
+  // เปลี่ยนเสา/วันที่ → reset ไฟล์
   useEffect(() => {
-    setClipDate(null);
     setClipFile(null);
-  }, [selectedId]);
-
-  // dates โหลดมา → เลือกวันใหม่สุด
-  useEffect(() => {
-    if (dates.data && dates.data.length > 0 && clipDate === null) {
-      setClipDate(dates.data[0]!.date);
-    }
-  }, [dates.data, clipDate]);
+  }, [selectedId, clipDate]);
 
   // clips โหลดมา → เลือกไฟล์ใหม่สุด
   useEffect(() => {
@@ -104,21 +96,12 @@ export default function DashboardPage() {
     }
   }, [clips.data, clipFile]);
 
-  // เปลี่ยนวันที่ → reset ไฟล์
-  useEffect(() => {
-    setClipFile(null);
-  }, [clipDate]);
-
-  const dateOptions = useMemo(
-    () => (dates.data ?? []).map((d) => ({ id: d.date, label: `${d.date} (${d.fileCount})` })),
-    [dates.data],
-  );
   const fileOptions = useMemo(
     () => (clips.data ?? []).map((c) => ({ id: c.filename, label: c.filename })),
     [clips.data],
   );
 
-  const clipUrl = selected && clipDate && clipFile
+  const clipUrl = selected && clipFile
     ? cameraClipApi.buildStreamUrl(selected.poleName, clipDate, clipFile)
     : null;
 
@@ -184,13 +167,10 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="text-sm font-medium">บันทึกกล้อง — {selected.poleName}</div>
             <div className="flex items-center gap-2 flex-wrap">
-              <AppCombobox
+              <AppDatePicker
                 className="w-44"
-                options={dateOptions}
                 value={clipDate}
-                onChange={(v) => setClipDate(String(v))}
-                required
-                disabled={dates.isLoading || dateOptions.length === 0}
+                onChange={setClipDate}
               />
               <AppCombobox
                 className="w-56"
@@ -215,7 +195,7 @@ export default function DashboardPage() {
             ) : (
               <div className="flex flex-col items-center text-gray-400">
                 <Video className="h-10 w-10 mb-2" />
-                {dates.data?.length === 0 ? "ไม่พบคลิปสำหรับเสานี้" : "เลือกวันที่และไฟล์"}
+                {clips.data && clips.data.length === 0 ? "ไม่มีคลิปในวันที่เลือก" : "เลือกไฟล์ที่ต้องการดู"}
               </div>
             )}
           </div>

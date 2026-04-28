@@ -1,11 +1,6 @@
 import { apiClient } from "./client";
 import { env } from "@/config/env";
 
-export interface ClipDate {
-  date: string;       // YYYY-MM-DD
-  fileCount: number;
-}
-
 export interface ClipItem {
   filename: string;
   sizeBytes: number;
@@ -13,12 +8,6 @@ export interface ClipItem {
 }
 
 export const cameraClipApi = {
-  listDates: async (poleName: string) => {
-    const res = await apiClient.get<{ success: true; data: ClipDate[] }>(
-      `/api/cameras/${encodeURIComponent(poleName)}/dates`,
-    );
-    return res.data.data;
-  },
   listClips: async (poleName: string, date: string) => {
     const res = await apiClient.get<{ success: true; data: ClipItem[] }>(
       `/api/cameras/${encodeURIComponent(poleName)}/clips`,
