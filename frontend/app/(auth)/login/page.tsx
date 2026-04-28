@@ -56,7 +56,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl border-sidebar-border">
         <CardHeader className="text-center space-y-2">
           <div className="flex justify-center">
-            <Image src="/logo.png" alt="Smart Pole" width={100} height={100} priority />
+            <Image src="/logo.png" alt="Smart Pole" width={120} height={120} priority />
           </div>
           <CardTitle className="text-2xl font-bold text-primary-dark">Smart Pole Management</CardTitle>
           <p className="text-sm text-brand-muted">ระบบบริหารเสาอัจฉริยะ</p>
@@ -91,7 +91,7 @@ export default function LoginPage() {
                   <img
                     src={captcha.data.image}
                     alt="captcha"
-                    className="h-12 flex-1 border rounded bg-white"
+                    className="h-12 flex-1 border rounded bg-white object-fill"
                   />
                 )}
                 <Button
@@ -101,6 +101,7 @@ export default function LoginPage() {
                   onClick={() => captcha.refetch()}
                   aria-label="โหลด captcha ใหม่"
                   disabled={captcha.isFetching}
+                  className="shrink-0"
                 >
                   <RefreshCcw className={`h-4 w-4 ${captcha.isFetching ? "animate-spin" : ""}`} />
                 </Button>
