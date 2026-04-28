@@ -59,43 +59,48 @@ export default function RolesPage() {
       align: "center",
       render: (r) => r._count.permissions,
     },
-    {
+    ...(canRowAction ? [{
       title: "",
       key: "actions",
-      width: "fit",
-      fixed: "right",
-      render: (r) => (
+      width: "fit" as const,
+      fixed: "right" as const,
+      render: (r: RoleListItem) => (
         <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setEditingId(r.id)}
-            disabled={r.isSystem}
-          >
-            <Settings2 className="mr-1 h-3.5 w-3.5" />
-            จัดการสิทธิ์
-          </Button>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="text-destructive"
-            aria-label="ลบ"
-            disabled={r.isSystem || r._count.users > 0}
-            onClick={() =>
-              confirm({
-                title: "ลบบทบาท",
-                description: `ลบ "${r.description || r.name}"?`,
-                onAction: () => del.mutate(r.id),
-                actionVariant: "destructive",
-              })
-            }
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setEditingId(r.id)}
+              disabled={r.isSystem}
+              title={r.isSystem ? "บทบาทระบบ — ห้ามแก้ไข" : undefined}
+            >
+              <Settings2 className="mr-1 h-3.5 w-3.5" />
+              จัดการสิทธิ์
+            </Button>
+          )}
+          {canDelete && (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="text-destructive"
+              aria-label="ลบ"
+              disabled={r.isSystem || r._count.users > 0}
+              onClick={() =>
+                confirm({
+                  title: "ลบบทบาท",
+                  description: `ลบ "${r.description || r.name}"?`,
+                  onAction: () => del.mutate(r.id),
+                  actionVariant: "destructive",
+                })
+              }
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
       ),
-    },
-  ], [del, confirm]);
+    }] : []),
+  ], [del, confirm, canRowAction, canEdit, canDelete]);
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-4 h-full overflow-hidden">
@@ -104,10 +109,12 @@ export default function RolesPage() {
           <h1 className="text-2xl font-bold text-primary-dark">บทบาท &amp; สิทธิ์</h1>
           <p className="text-sm text-brand-muted">บทบาท {roles.data?.total ?? 0} รายการ</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          เพิ่มบทบาทใหม่
-        </Button>
+        {canCreate && (
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            เพิ่มบทบาทใหม่
+          </Button>
+        )}
       </div>
 
       <DataTable<RoleListItem>

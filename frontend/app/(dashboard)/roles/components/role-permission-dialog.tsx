@@ -78,7 +78,7 @@ export function RolePermissionDialog({ editingId, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-5xl! w-[95vw] max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>
             จัดการสิทธิ์ — {role.data?.description || role.data?.name || "..."}

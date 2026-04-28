@@ -18,6 +18,7 @@ import type { Column } from "@/components/layout/data-table";
 import { usePoleLookup } from "@/hooks/api/use-poles";
 import { useRecordings, useDeleteRecording } from "@/hooks/api/use-recordings";
 import { useAppAlertDialog } from "@/hooks/use-app-alert-dialog";
+import { usePermission } from "@/hooks/use-permission";
 import { recordingApi, type RecordingItem } from "@/lib/api/recording";
 import { env } from "@/config/env";
 
@@ -45,6 +46,8 @@ export default function CameraPage() {
   const list = useRecordings({ page, limit, poleId: poleId ?? undefined, date });
   const del = useDeleteRecording();
   const { confirm, AlertDialogComponent } = useAppAlertDialog();
+  const { hasPermission } = usePermission();
+  const canDelete = hasPermission("camera_archive:delete");
 
   const poleOptions = useMemo(
     () => (poleLookup.data ?? []).filter((p) => p.hasCamera).map((p) => ({ id: p.id, label: p.poleName })),
@@ -95,26 +98,28 @@ export default function CameraPage() {
           <Button size="icon-sm" variant="ghost" aria-label="เล่น" onClick={() => handlePlay(r)}>
             <Play className="h-3.5 w-3.5" />
           </Button>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="text-destructive"
-            aria-label="ลบ"
-            onClick={() =>
-              confirm({
-                title: "ลบบันทึก",
-                description: "ต้องการลบคลิปนี้ใช่หรือไม่?",
-                onAction: () => del.mutate(Number(r.id)),
-                actionVariant: "destructive",
-              })
-            }
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+          {canDelete && (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="text-destructive"
+              aria-label="ลบ"
+              onClick={() =>
+                confirm({
+                  title: "ลบบันทึก",
+                  description: "ต้องการลบคลิปนี้ใช่หรือไม่?",
+                  onAction: () => del.mutate(Number(r.id)),
+                  actionVariant: "destructive",
+                })
+              }
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
       ),
     },
-  ], [del, confirm]);
+  ], [del, confirm, canDelete]);
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-4 h-full overflow-hidden">

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAlerts, useResolveAlert } from "@/hooks/api/use-alerts";
 import { useAppAlertDialog } from "@/hooks/use-app-alert-dialog";
+import { usePermission } from "@/hooks/use-permission";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AppCombobox } from "@/components/layout/app-combobox";
@@ -26,6 +27,8 @@ export default function AlertsPage() {
   });
   const resolveAlert = useResolveAlert();
   const { confirm, AlertDialogComponent } = useAppAlertDialog();
+  const { hasPermission } = usePermission();
+  const canResolve = hasPermission("alert:edit");
 
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -85,7 +88,7 @@ export default function AlertsPage() {
                     เกิดเมื่อ: {new Date(a.triggeredAt).toLocaleString("th-TH")}
                   </div>
                 </div>
-                {!a.isResolved && (
+                {!a.isResolved && canResolve && (
                   <Button
                     size="sm"
                     variant="outline"
