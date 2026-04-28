@@ -122,4 +122,4 @@ services:
 networks:
   smart-pole-network:
     name: smart-pole-network
-    driver: bridge
+    external: true
