@@ -23,6 +23,8 @@ export const poleController = new Elysia({ prefix: "/api/poles" })
         search: query.search,
         poleStatus: query.poleStatus,
         hasCamera: query.hasCamera,
+        sortBy: query.sortBy,
+        sortOrder: query.sortOrder,
       });
       return { success: true, ...result, page: query.page, limit: query.limit };
     },

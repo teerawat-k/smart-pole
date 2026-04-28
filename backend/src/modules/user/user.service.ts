@@ -29,7 +29,7 @@ async function getById(id: number) {
 
 export const userService = {
   // ── reads ──
-  list: (params: { page: number; limit: number; search?: string; roleId?: number; status?: "active" | "disabled" | "locked" }) =>
+  list: (params: { page: number; limit: number; search?: string; roleId?: number; status?: "active" | "disabled" | "locked"; sortBy?: string; sortOrder?: "asc" | "desc" }) =>
     userRepository.findMany(params),
   getById,
   lookup: () => userRepository.findLookup(),

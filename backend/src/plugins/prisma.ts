@@ -8,6 +8,12 @@ import { env } from "@/config/env";
   return Number(this.toString());
 };
 
+// BigInt → number ตอน serialize (lastSeenAt เก็บ epoch ms เป็น BigInt — ปลอดภัยถึงปี 287396)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- BigInt prototype patch
+(BigInt.prototype as any).toJSON = function () {
+  return Number(this);
+};
+
 const adapter = new PrismaPg({ connectionString: env.DATABASE_URL });
 
 declare global {

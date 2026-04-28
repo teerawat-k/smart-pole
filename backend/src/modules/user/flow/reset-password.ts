@@ -1,6 +1,7 @@
 // ── Atom: admin reset user password ────────────────────────
 import { userRepository } from "../user.repository";
 import { auditService, AuditAction } from "@/modules/audit";
+import { authRepository } from "@/modules/auth/auth.repository";
 import { NotFoundError } from "@/common/errors";
 import { ErrorCode } from "@/common/errors/codes";
 import { hashPassword } from "@/common/utils/password";
@@ -20,6 +21,12 @@ export async function resetUserPassword(id: number, input: UserResetPasswordInpu
     module: USER_ENTITY,
     targetId: id,
   });
+
+  authRepository.logSystem({
+    logType: "password_reset",
+    userId: requestUserId,
+    usernameSnap: user.username,
+  }).catch(() => {});
 
   return { success: true };
 }

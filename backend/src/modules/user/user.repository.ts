@@ -59,7 +59,20 @@ export const userRepository = {
     search?: string;
     roleId?: number;
     status?: UserStatus;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
   }) {
+    const SORT_WHITELIST: Record<string, keyof Prisma.UserOrderByWithRelationInput> = {
+      username: "username",
+      firstName: "firstName",
+      email: "email",
+      status: "status",
+      lastLoginAt: "lastLoginAt",
+      createdAt: "createdAt",
+    };
+    const orderByKey = (params.sortBy && SORT_WHITELIST[params.sortBy]) ?? "createdAt";
+    const orderBy: Prisma.UserOrderByWithRelationInput = { [orderByKey]: params.sortOrder ?? "desc" };
+
     const where: Prisma.UserWhereInput = {
       deletedAt: null,
       ...(params.roleId && { roleId: params.roleId }),
@@ -78,7 +91,7 @@ export const userRepository = {
       prisma.user.findMany({
         where,
         select: USER_LIST_SELECT,
-        orderBy: { createdAt: "desc" },
+        orderBy,
         skip: (params.page - 1) * params.limit,
         take: params.limit,
       }),
@@ -182,7 +195,7 @@ export const userRepository = {
 
   async setStatus(id: number, status: UserStatus, updatedBy: number, tx?: PrismaTx) {
     const client = tx ?? prisma;
-    const data: Prisma.UserUpdateInput = { status, updatedBy };
+    const data: Prisma.UserUncheckedUpdateInput = { status, updatedBy };
     if (status === "active") {
       data.loginFailCount = 0;
       data.lockedUntil = null;

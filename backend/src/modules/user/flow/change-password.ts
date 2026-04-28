@@ -2,6 +2,7 @@
 // Steps: check new!=current → find user → verify current → hash → update + bump tokenVersion → audit
 import { userRepository } from "../user.repository";
 import { auditService, AuditAction } from "@/modules/audit";
+import { authRepository } from "@/modules/auth/auth.repository";
 import { NotFoundError, UnauthorizedError, ValidationError } from "@/common/errors";
 import { ErrorCode } from "@/common/errors/codes";
 import { hashPassword, verifyPassword } from "@/common/utils/password";
@@ -31,6 +32,12 @@ export async function changeMyPassword(input: UserChangePasswordInput, requestUs
     module: USER_ENTITY,
     targetId: requestUserId,
   });
+
+  authRepository.logSystem({
+    logType: "password_changed",
+    userId: requestUserId,
+    usernameSnap: profile?.username,
+  }).catch(() => {});
 
   return { success: true };
 }

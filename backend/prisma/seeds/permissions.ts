@@ -13,24 +13,22 @@ interface PermissionSeed {
   actionDescription?: string;
 }
 
+// แต่ละ entry สะท้อน action ที่ UI ปัจจุบันรองรับจริงเท่านั้น
+// (ลบ action ที่ไม่มีปุ่ม/ฟังก์ชันใน UI — เพื่อไม่ให้สิทธิ์ที่ไม่มีผลปรากฏใน dialog)
 const PERMISSIONS: PermissionSeed[] = [
   // ── Monitoring ──
-  ...buildModule("dashboard", "Monitoring", "monitoring", "Dashboard", ["view"]),
-  ...buildModule("camera_archive", "Monitoring", "monitoring", "Camera Archive", ["view", "delete", "export"]),
-  ...buildModule("sensor_archive", "Monitoring", "monitoring", "Sensor Archive", ["view", "export"]),
-  ...buildModule("alert", "Monitoring", "monitoring", "Alert", ["view", "edit"]),
+  ...buildModule("dashboard",      "Monitoring", "monitoring", "แดชบอร์ด",         ["view"]),
+  ...buildModule("camera_archive", "Monitoring", "monitoring", "บันทึกกล้อง",      ["view", "delete"]),
+  ...buildModule("sensor_archive", "Monitoring", "monitoring", "ข้อมูลเซนเซอร์",   ["view", "export"]),
+  ...buildModule("alert",          "Monitoring", "monitoring", "การแจ้งเตือน",     ["view", "edit"]),
 
   // ── Master ──
   ...buildModule("pole", "ข้อมูลหลัก", "master", "เสาสัญญาณ", ["view", "create", "edit", "delete"]),
 
   // ── Admin ──
-  ...buildModule("user", "Admin", "admin", "ผู้ใช้งาน", ["view", "create", "edit", "delete"]),
-  ...buildModule("role", "Admin", "admin", "Role & Permission", ["view", "create", "edit", "delete"]),
-  ...buildModule("audit_log", "Admin", "admin", "Audit Log", ["view", "export"]),
-  ...buildModule("system_log", "Admin", "admin", "System Log", ["view", "export"]),
-
-  // ── Personal (ทุกคนใช้ได้) ──
-  ...buildModule("my_profile", "ส่วนตัว", "personal", "โปรไฟล์ของฉัน", ["view", "edit"]),
+  ...buildModule("user",       "Admin", "admin", "ผู้ใช้งาน",        ["view", "create", "edit", "delete"]),
+  ...buildModule("role",       "Admin", "admin", "บทบาทและสิทธิ์",  ["view", "create", "edit", "delete"]),
+  ...buildModule("system_log", "Admin", "admin", "บันทึกกิจกรรม",   ["view"]),
 ];
 
 function buildModule(

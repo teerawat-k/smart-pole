@@ -7,10 +7,7 @@ const SYSTEM_LOG_LIST_SELECT = {
   userId: true,
   usernameSnap: true,
   failReason: true,
-  pageKey: true,
   ipAddress: true,
-  userAgent: true,
-  detail: true,
   createdAt: true,
 } satisfies Prisma.SystemLogSelect;
 

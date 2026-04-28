@@ -55,6 +55,12 @@ export async function verifyCredentials(username: string, password: string): Pro
     const decision = computeLockout(newFailCount);
     if (decision.permanent) {
       await authRepository.setStatusLocked(user.id, "too_many_attempts");
+      authRepository.logSystem({
+        logType: "account_locked",
+        userId: user.id,
+        usernameSnap: user.username,
+        failReason: "too_many_attempts",
+      }).catch(() => {});
       return { ok: false, reason: "ACCOUNT_LOCKED", userId: user.id, usernameSnap: username };
     }
     await authRepository.incrementFailCount(

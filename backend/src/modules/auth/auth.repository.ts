@@ -99,7 +99,7 @@ export const authRepository = {
 
   // ── System log entries ────────────────────────────────
   async logSystem(data: {
-    logType: "login_success" | "login_fail" | "logout" | "captcha_fail";
+    logType: "login_success" | "login_fail" | "logout" | "captcha_fail" | "password_changed" | "password_reset" | "account_locked" | "account_unlocked";
     userId?: number;
     usernameSnap?: string;
     failReason?: string;

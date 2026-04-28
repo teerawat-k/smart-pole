@@ -26,6 +26,8 @@ export const userController = new Elysia({ prefix: "/api/users" })
         search: query.search,
         roleId: query.roleId,
         status: query.status,
+        sortBy: query.sortBy,
+        sortOrder: query.sortOrder,
       });
       return { success: true, ...result, page: query.page, limit: query.limit };
     },
