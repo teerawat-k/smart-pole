@@ -86,12 +86,12 @@ export default function LoginPage() {
               <Label htmlFor="captcha">รหัสยืนยัน</Label>
               <div className="flex items-center gap-2">
                 {captcha.isLoading || !captcha.data ? (
-                  <div className="h-12 w-40 bg-muted animate-pulse rounded" />
+                  <div className="h-12 flex-1 bg-muted animate-pulse rounded" />
                 ) : (
                   <img
                     src={captcha.data.image}
                     alt="captcha"
-                    className="h-12 w-40 border rounded bg-white"
+                    className="h-12 flex-1 border rounded bg-white"
                   />
                 )}
                 <Button
