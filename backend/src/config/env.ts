@@ -26,6 +26,9 @@ const envSchema = z.object({
   MQTT_CLIENT_ID: z.string().default("smart-pole-backend"),
   MQTT_TIMESTAMP_DRIFT_MAX_SEC: z.coerce.number().default(300),
 
+  // Pole offline threshold (นาที) — background job mark offline ถ้า lastSeenAt เกิน
+  POLE_OFFLINE_THRESHOLD_MINUTES: z.coerce.number().default(5),
+
   // SRS streaming
   SRS_HLS_BASE: z.string().default("http://localhost:7780"),
   SRS_DVR_TOKEN: z.string().default("replace-me"),

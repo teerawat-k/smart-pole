@@ -17,7 +17,7 @@ async function getById(id: number) {
 }
 
 export const poleService = {
-  list: (params: { page: number; limit: number; search?: string; poleStatus?: PoleStatus; hasCamera?: boolean }) =>
+  list: (params: { page: number; limit: number; search?: string; poleStatus?: PoleStatus; hasCamera?: boolean; sortBy?: string; sortOrder?: "asc" | "desc" }) =>
     poleRepository.findMany(params),
   getById,
   lookup: () => poleRepository.findLookup(),
@@ -30,22 +30,11 @@ export const poleService = {
   regenerateCredential: (id: number, requestUserId: number) => regenerateMqttCredential(id, requestUserId),
   delete: (id: number, requestUserId: number) => softDeletePole(id, requestUserId),
 
-  // ── Internal: MQTT-driven status updates (เรียกจาก E06 handler) ──
-  recordHeartbeat: async (poleName: string, time: Date) => {
-    const pole = await poleRepository.findByName(poleName);
-    if (!pole) return null;
-    return poleRepository.updateStatus(pole.id, "online", { lastSeenAt: time });
-  },
-
+  // ── Internal: MQTT-driven status updates (เรียกจาก MQTT handler) ──
+  // maintenance เป็นแค่ tag บอกสถานะ — heartbeat ทำงานปกติ ไม่ต้อง guard
   markOffline: async (poleName: string) => {
     const pole = await poleRepository.findByName(poleName);
     if (!pole) return null;
     return poleRepository.updateStatus(pole.id, "offline");
-  },
-
-  touchLastSeen: async (poleName: string, time: Date) => {
-    const pole = await poleRepository.findByName(poleName);
-    if (!pole) return null;
-    return poleRepository.updateStatus(pole.id, "online", { lastSeenAt: time });
   },
 };

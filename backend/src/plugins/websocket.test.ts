@@ -103,7 +103,7 @@ describe("broadcast functions", () => {
   test("broadcastPoleStatus ส่ง pole-status-changed", () => {
     const ws = makeWs();
     addConnection(7001, ws);
-    broadcastPoleStatus("pole-001", "online", new Date("2026-04-27T10:00:00Z"));
+    broadcastPoleStatus("pole-001", "online", BigInt(Date.now()));
     const parsed = JSON.parse(ws.messages[0]!) as { type: string; payload: { poleName: string; status: string } };
     expect(parsed.type).toBe("pole-status-changed");
     expect(parsed.payload.poleName).toBe("pole-001");

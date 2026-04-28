@@ -44,6 +44,8 @@ const POLE_LOOKUP_SELECT = {
   hasCamera: true,
   hasPm25Sensor: true,
   hasTempHumidity: true,
+  poleStatus: true,
+  lastSeenAt: true,
 } satisfies Prisma.PoleSelect;
 
 export const poleRepository = {
@@ -53,7 +55,19 @@ export const poleRepository = {
     search?: string;
     poleStatus?: PoleStatus;
     hasCamera?: boolean;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
   }) {
+    const SORT_WHITELIST: Record<string, keyof Prisma.PoleOrderByWithRelationInput> = {
+      poleName: "poleName",
+      installPlace: "installPlace",
+      poleStatus: "poleStatus",
+      lastSeenAt: "lastSeenAt",
+      createdAt: "createdAt",
+    };
+    const orderByKey = (params.sortBy && SORT_WHITELIST[params.sortBy]) ?? "createdAt";
+    const orderBy: Prisma.PoleOrderByWithRelationInput = { [orderByKey]: params.sortOrder ?? "desc" };
+
     const where: Prisma.PoleWhereInput = {
       deletedAt: null,
       ...(params.poleStatus && { poleStatus: params.poleStatus }),
@@ -70,7 +84,7 @@ export const poleRepository = {
       prisma.pole.findMany({
         where,
         select: POLE_LIST_SELECT,
-        orderBy: { createdAt: "desc" },
+        orderBy,
         skip: (params.page - 1) * params.limit,
         take: params.limit,
       }),
@@ -169,7 +183,7 @@ export const poleRepository = {
   async updateStatus(
     id: number,
     status: PoleStatus,
-    extras?: { lastSeenAt?: Date; maintenanceReason?: string | null; updatedBy?: number },
+    extras?: { lastSeenAt?: bigint; maintenanceReason?: string | null; updatedBy?: number },
     tx?: PrismaTx,
   ) {
     const client = tx ?? prisma;

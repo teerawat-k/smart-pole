@@ -2,11 +2,13 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/plugins/prisma";
 
 export interface CreateAuditLogInput {
-  userId: number;
+  userId: number | null; // null = system action (MQTT, cron)
   action: string;
   module: string;
   targetId: number;
   payload?: unknown;
+  before?: Record<string, Prisma.JsonValue>;
+  after?: Record<string, Prisma.JsonValue>;
 }
 
 export interface ListAuditLogParams {
@@ -27,6 +29,8 @@ const AUDIT_LIST_SELECT = {
   module: true,
   targetId: true,
   payload: true,
+  before: true,
+  after: true,
   createdAt: true,
 } satisfies Prisma.AuditLogSelect;
 
@@ -39,6 +43,8 @@ export const auditRepository = {
         module: data.module,
         targetId: data.targetId,
         ...(data.payload !== undefined ? { payload: data.payload as object } : {}),
+        ...(data.before !== undefined ? { before: data.before as Prisma.InputJsonObject } : {}),
+        ...(data.after !== undefined ? { after: data.after as Prisma.InputJsonObject } : {}),
       },
     });
   },

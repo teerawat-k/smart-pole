@@ -4,9 +4,9 @@
 import { prisma } from "@/plugins/prisma";
 import { logger } from "@/plugins/logger";
 import { broadcastPoleStatus } from "@/plugins/websocket";
-import { systemConfigService } from "@/modules/system-config";
 import { auditService, AuditAction, SYSTEM_USER_ID } from "@/modules/audit";
 import { alertService, AlertType } from "@/modules/alert";
+import { env } from "@/config/env";
 
 export interface ScanResult {
   detected: number;
@@ -14,8 +14,8 @@ export interface ScanResult {
 }
 
 export async function scanOfflinePoles(): Promise<ScanResult> {
-  const thresholdMinutes = await systemConfigService.get<number>("pole.offline_threshold_minutes", 3);
-  const cutoff = new Date(Date.now() - thresholdMinutes * 60_000);
+  const thresholdMinutes = env.POLE_OFFLINE_THRESHOLD_MINUTES;
+  const cutoff = BigInt(Date.now() - thresholdMinutes * 60_000);
 
   const candidates = await prisma.pole.findMany({
     where: {

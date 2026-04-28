@@ -55,7 +55,7 @@ export function broadcastToAll(message: unknown): void {
   }
 }
 
-export function broadcastPoleStatus(poleName: string, status: string, lastSeenAt?: Date): void {
+export function broadcastPoleStatus(poleName: string, status: string, lastSeenAt?: bigint): void {
   broadcastToAll({
     type: "pole-status-changed",
     payload: { poleName, status, lastSeenAt },
