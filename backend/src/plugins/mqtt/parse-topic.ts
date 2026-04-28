@@ -1,17 +1,16 @@
-// ── Atom: parse MQTT topic → { poleName, messageType } ─────
-// Topic pattern: smartpole/{poleName}/{messageType}
+// ── Atom: parse MQTT topic → messageType ───────────────────
+// Topic pattern: smartpole/sensor — poleName อยู่ใน payload
+
+export type MessageType = "sensor";
 
 export interface ParsedTopic {
-  poleName: string;
-  messageType: string;
+  messageType: MessageType;
 }
 
 export function parseTopic(topic: string): ParsedTopic | null {
   const parts = topic.split("/");
-  if (parts.length < 3) return null;
+  if (parts.length !== 2) return null;
   if (parts[0] !== "smartpole") return null;
-  const poleName = parts[1];
-  const messageType = parts.slice(2).join("/");
-  if (!poleName || !messageType) return null;
-  return { poleName, messageType };
+  if (parts[1] !== "sensor") return null;
+  return { messageType: "sensor" };
 }

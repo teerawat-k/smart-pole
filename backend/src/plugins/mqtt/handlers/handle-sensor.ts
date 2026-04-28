@@ -1,41 +1,22 @@
-// ── Handler: dispatch sensor reading messages ─────────────
-// Validate envelope → iterate readings → ใช้ sensor registry dispatch
-// ทุก sensor key validate Zod ของ handler — fail key ใดๆ ไม่ block key อื่น
+// ── Handler: sensor packet (flat) ──────────────────────────
+// validate → resolve poleId → insert SensorReading + update Pole.latest* + lastSeenAt + broadcast
+// timestamp: เก็บ raw epoch ตรงๆ (ไม่แปลง) — frontend แปลง timezone เอง
 import { sensorMessageSchema } from "../schemas";
-import { getSensorHandler } from "../sensor-registry";
-import { poleService } from "@/modules/pole";
 import { prisma } from "@/plugins/prisma";
 import { logger } from "@/plugins/logger";
 import { broadcastSensorReading } from "@/plugins/websocket";
-import { env } from "@/config/env";
+import { Prisma } from "@prisma/client";
 
-export async function handleSensorMessage(poleName: string, raw: unknown): Promise<void> {
+export async function handleSensorMessage(raw: unknown): Promise<void> {
   const parsed = sensorMessageSchema.safeParse(raw);
   if (!parsed.success) {
-    logger.warn({ poleName, errors: parsed.error.flatten() }, "MQTT sensor: validation failed");
+    logger.warn({ errors: parsed.error.flatten() }, "MQTT sensor: validation failed");
     return;
   }
   const msg = parsed.data;
+  const poleName = msg.pole_name;
+  const time = BigInt(msg.timestamp);
 
-  if (msg.poleName !== poleName) {
-    logger.warn({ topicPole: poleName, payloadPole: msg.poleName }, "MQTT sensor: poleName mismatch");
-    return;
-  }
-
-  const time = new Date(msg.timestamp);
-  if (Number.isNaN(time.getTime())) {
-    logger.warn({ poleName, timestamp: msg.timestamp }, "MQTT sensor: invalid timestamp");
-    return;
-  }
-
-  // drift check
-  const driftSec = Math.abs((Date.now() - time.getTime()) / 1000);
-  if (driftSec > env.MQTT_TIMESTAMP_DRIFT_MAX_SEC) {
-    logger.warn({ poleName, driftSec }, "MQTT sensor: timestamp drift exceeded");
-    return;
-  }
-
-  // resolve poleId from poleName
   const pole = await prisma.pole.findFirst({
     where: { poleName, deletedAt: null },
     select: { id: true },
@@ -45,52 +26,28 @@ export async function handleSensorMessage(poleName: string, raw: unknown): Promi
     return;
   }
 
-  // dispatch readings
-  for (const [sensorKey, payload] of Object.entries(msg.readings)) {
-    const handler = getSensorHandler(sensorKey);
-    if (!handler) {
-      // unknown sensor — เก็บใน sensor_unknown debug table
-      await prisma.sensorUnknown.create({
-        data: {
-          time,
-          poleId: pole.id,
-          sensorKey,
-          rawJson: payload as object,
-          reason: "no_handler",
-        },
-      });
-      continue;
-    }
-    const validated = handler.schema.safeParse(payload);
-    if (!validated.success) {
-      await prisma.sensorUnknown.create({
-        data: {
-          time,
-          poleId: pole.id,
-          sensorKey,
-          rawJson: payload as object,
-          reason: "validation_failed",
-        },
-      });
-      continue;
-    }
-    try {
-      await handler.write({
-        poleId: pole.id,
-        time,
-        seq: BigInt(msg.seq),
-        data: validated.data,
-        rawJson: payload,
-      });
-      // realtime broadcast
-      broadcastSensorReading(poleName, sensorKey, validated.data as Record<string, unknown>);
-    } catch (err) {
-      logger.error({ err, poleName, sensorKey }, "MQTT sensor: handler write failed");
-    }
-  }
+  const seq = BigInt(msg.seq);
+  const pm25        = msg.pm25        !== undefined ? new Prisma.Decimal(msg.pm25)        : null;
+  const temperature = msg.temperature !== undefined ? new Prisma.Decimal(msg.temperature) : null;
+  const humidity    = msg.humidity    !== undefined ? new Prisma.Decimal(msg.humidity)    : null;
 
-  // touch pole.lastSeenAt
-  await poleService.touchLastSeen(poleName, time).catch((err) => {
-    logger.warn({ err, poleName }, "MQTT sensor: touchLastSeen failed");
-  });
+  await Promise.all([
+    prisma.sensorReading.create({
+      data: { time, poleId: pole.id, seq, pm25, temperature, humidity },
+    }),
+    prisma.pole.update({
+      where: { id: pole.id },
+      data: {
+        poleStatus: "online",
+        lastSeenAt: time,
+        latestSeq: seq,
+        latestPm25: pm25,
+        latestTemperature: temperature,
+        latestHumidity: humidity,
+        latestReadingAt: time,
+      },
+    }),
+  ]);
+
+  broadcastSensorReading(poleName, "sensor", msg);
 }

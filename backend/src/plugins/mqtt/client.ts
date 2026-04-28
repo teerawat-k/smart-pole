@@ -1,12 +1,10 @@
 // ── MQTT client singleton ──────────────────────────────────
-// Connect ที่ start, subscribe ทุก smartpole topic, dispatch ไป handlers
+// Subscribe smartpole/sensor, dispatch ไป handler
 import mqtt, { type MqttClient } from "mqtt";
 import { env } from "@/config/env";
 import { logger } from "@/plugins/logger";
 import { parseTopic } from "./parse-topic";
 import { handleSensorMessage } from "./handlers/handle-sensor";
-import { handleHeartbeatMessage } from "./handlers/handle-heartbeat";
-import { handleEventMessage } from "./handlers/handle-event";
 
 let client: MqttClient | null = null;
 
@@ -33,10 +31,8 @@ export function startMqttSubscriber(): void {
 
   client.on("connect", () => {
     logger.info("MQTT: connected");
-    client?.subscribe("smartpole/+/sensor", { qos: 1 });
-    client?.subscribe("smartpole/+/heartbeat", { qos: 0 });
-    client?.subscribe("smartpole/+/event", { qos: 2 });
-    logger.info("MQTT: subscribed to smartpole/+/{sensor,heartbeat,event}");
+    client?.subscribe("smartpole/sensor", { qos: 1 });
+    logger.info("MQTT: subscribed to smartpole/sensor");
   });
 
   client.on("reconnect", () => logger.warn("MQTT: reconnecting..."));
@@ -59,19 +55,7 @@ export function startMqttSubscriber(): void {
     }
 
     try {
-      switch (parsedTopic.messageType) {
-        case "sensor":
-          await handleSensorMessage(parsedTopic.poleName, json);
-          break;
-        case "heartbeat":
-          await handleHeartbeatMessage(parsedTopic.poleName, json);
-          break;
-        case "event":
-          await handleEventMessage(parsedTopic.poleName, json);
-          break;
-        default:
-          logger.warn({ messageType: parsedTopic.messageType }, "MQTT: unhandled message type");
-      }
+      await handleSensorMessage(json);
     } catch (err) {
       logger.error({ err, topic }, "MQTT: handler crashed");
     }
