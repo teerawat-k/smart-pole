@@ -1,163 +1,157 @@
 # CI/CD Setup Guide
 
-> ขั้นตอนที่ต้องทำใน GitHub repo + secrets + branch protection ก่อนเปิด CI/CD
+> Pattern: เลียนแบบ `pmk-psom-v2-remark` — สร้าง `.env` บน server on-the-fly จาก secrets/vars
+> Workflow ที่ deploy: `.github/workflows/uat-dev.yml` + `production.yml`
 
 ---
 
 ## 1. Branch Strategy
 
 ```
-main         ← production (protected, deploy ผ่าน workflow_dispatch หรือ merge)
+main         ← production deploy (manual approval)
 └── uat-dev  ← UAT auto-deploy ทุก push
     └── feature/* / fix/* / chore/*
 ```
 
 ---
 
-## 2. GitHub Secrets ที่ต้องตั้ง
+## 2. GitHub Environments
 
-ไปที่ **Settings → Secrets and variables → Actions**
+สร้าง 2 environments ที่ **Settings → Environments → New**:
 
-### Repository — ใช้ทุก environment
-
-#### 🟢 Variables (Settings → Secrets and variables → Actions → **Variables**)
-
-(ตอนนี้ยังไม่มีค่าระดับ repo ที่เป็น public — frontend URL อยู่ใน environment vars)
-
-#### 🔴 Secrets (Settings → Secrets and variables → Actions → **Secrets**)
-
-| Name | ตัวอย่างค่า | ใช้ที่ |
+| Name | Branch ที่ใช้ | Required reviewers |
 |---|---|---|
-| `DOCKERHUB_USERNAME` | `teerawatk` | build-and-push |
-| `DOCKERHUB_TOKEN` | Docker Hub access token | build-and-push |
+| `uat_dev_site` | `uat-dev` | ไม่ต้อง |
+| `production` | `main` | **ต้องมี** ≥ 1 |
 
-### UAT Environment
+---
 
-> สร้าง environment ชื่อ `uat-dev` ที่ **Settings → Environments → New environment**
-> แยกเก็บ 2 แบบ: **Variables** (public) กับ **Secrets** (private)
+## 3. Variables (🟢 public — log ได้, ไม่ mask)
 
-#### 🟢 Variables (ใส่ที่ tab **Variables**) — เก็บแบบ plain text, log ได้
+ตั้งที่ **Environment → Variables**
 
-ค่าเหล่านี้ถูก inline ลง JS bundle ของ frontend ตอน build → ผู้ใช้เห็นใน browser อยู่แล้ว ไม่ต้องเก็บเป็น secret:
+### Environment `uat_dev_site` — Variables
 
-| Name | ตัวอย่าง |
-|---|---|
-| `UAT_NEXT_PUBLIC_API_URL` | `https://api-uat.smart-pole.example.com` |
-| `UAT_NEXT_PUBLIC_WS_URL` | `wss://api-uat.smart-pole.example.com/ws` |
-| `UAT_NEXT_PUBLIC_HLS_BASE` | `https://stream-uat.smart-pole.example.com` |
-
-ใช้ใน workflow: `${{ vars.UAT_NEXT_PUBLIC_API_URL }}`
-
-#### 🔴 Secrets (ใส่ที่ tab **Secrets**) — masked ใน log
-
-| Name | ตัวอย่าง | ทำไมเป็น secret |
+| Name | ตัวอย่าง | คำอธิบาย |
 |---|---|---|
-| `UAT_HOST` | `uat.smart-pole.example.com` | ลด attack surface |
-| `UAT_USER` | `deploy` | login user |
-| `UAT_SSH_KEY` | private key (PEM, full content) | เข้า server ได้เต็ม |
-| `UAT_DEPLOY_PATH` | `/home/deploy/smart-pole` | path docker compose |
+| `NEXT_PUBLIC_API_URL` | `https://api-uat.smart-pole.example.com` | URL backend (frontend bundle) |
+| `NEXT_PUBLIC_WS_URL` | `wss://api-uat.smart-pole.example.com/ws` | URL WebSocket |
+| `NEXT_PUBLIC_HLS_BASE` | `https://stream-uat.smart-pole.example.com` | URL HLS playback |
+| `NEXT_PUBLIC_PROJECT_PREFIX` | `smart-pole-uat` | ใช้เป็น localStorage prefix |
+| `BACKEND_PORT` | `7766` | port backend container (host) |
+| `FRONTEND_PORT` | `7765` | port frontend container (host) |
+| `SRS_API_PORT` | `7785` | SRS HTTP API port (สำหรับ health check) |
+| `CORS_ORIGIN` | `https://uat.smart-pole.example.com` | URL frontend (สำหรับ CORS) |
+| `MQTT_BROKER_URL` | `mqtt://mosquitto:1883` | Override default ใน compose |
+| `SRS_HLS_BASE` | `http://srs:8080` | Override SRS internal URL |
+| `JWT_ACCESS_EXPIRES` | `15m` | (optional) |
+| `JWT_REFRESH_EXPIRES` | `7d` | (optional) |
+| `LOG_LEVEL` | `info` | `debug`/`info`/`warn` |
+| `POLE_OFFLINE_THRESHOLD_MINUTES` | `5` | นาที |
 
-ใช้ใน workflow: `${{ secrets.UAT_HOST }}`
+### Environment `production` — Variables
 
----
-
-### Production Environment
-
-> สร้าง environment `production` + ตั้ง **Required reviewers** (อย่างน้อย 1 คน) ก่อน deploy ทุกครั้ง
-
-#### 🟢 Variables
-
-| Name | ตัวอย่าง |
-|---|---|
-| `PROD_NEXT_PUBLIC_API_URL` | `https://api.smart-pole.example.com` |
-| `PROD_NEXT_PUBLIC_WS_URL` | `wss://api.smart-pole.example.com/ws` |
-| `PROD_NEXT_PUBLIC_HLS_BASE` | `https://stream.smart-pole.example.com` |
-
-#### 🔴 Secrets
-
-| Name | ตัวอย่าง |
-|---|---|
-| `PROD_HOST` | `smart-pole.example.com` |
-| `PROD_USER` | `deploy` |
-| `PROD_SSH_KEY` | private key — **แยกจาก UAT** |
-| `PROD_DEPLOY_PATH` | `/opt/smart-pole` |
+ตัวเดียวกันแต่ใช้ค่า production (URLs, prefix `smart-pole`)
 
 ---
 
-## 3. Environment Variables บน Host (ไม่ผ่าน GitHub Secrets)
+## 4. Secrets (🔴 private — masked ใน log)
 
-ค่าเหล่านี้อยู่ใน `.env` ของแต่ละ host (mounted via `env_file`):
+### Repository Secrets (Settings → Secrets and variables → Actions → Secrets)
 
-### Backend (`backend/.env` บน UAT/Production host)
+ใช้ทุก environment:
 
-| Key | ดู template |
+| Name | คำอธิบาย |
 |---|---|
-| `NODE_ENV` | `staging` / `production` |
-| `PORT` | `7766` |
-| `DATABASE_URL` | Postgres connection string |
-| `JWT_SECRET` | random ≥ 32 chars (แยกแต่ละ env) |
-| `JWT_ACCESS_EXPIRES` | `15m` |
-| `JWT_REFRESH_EXPIRES` | `7d` |
-| `CORS_ORIGIN` | URL ของ frontend |
-| `UPLOAD_DIR` | `data/uploads` |
-| `RECORDINGS_DIR` | `data/recordings` |
-| `MQTT_BROKER_URL` | `mqtt://mosquitto:1883` (UAT) / `mqtts://...:8883` (Prod) |
-| `MQTT_USERNAME` | backend subscriber username |
-| `MQTT_PASSWORD` | backend subscriber password |
-| `MQTT_CLIENT_ID` | unique per environment |
-| `MQTT_TIMESTAMP_DRIFT_MAX_SEC` | `300` |
-| `POLE_OFFLINE_THRESHOLD_MINUTES` | `5` |
-| `SRS_HLS_BASE` | URL HLS playback |
-| `SRS_DVR_TOKEN` | shared secret กับ SRS |
-| `LOG_LEVEL` | `info` (UAT) / `warn` (Prod) |
+| `DOCKERHUB_USERNAME` | username สำหรับ docker push |
+| `DOCKERHUB_TOKEN` | Docker Hub access token |
+| `DISCORD_WEBHOOK` | webhook URL สำหรับ notification |
 
-> Template: `backend/.env.uat.example`, `backend/.env.production.example`
+### Environment `uat_dev_site` — Secrets
 
-### Frontend (build-time only — inject ตอน Docker build)
-
-| Key | ผ่าน |
+| Name | คำอธิบาย |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | GitHub secret → Docker build-arg |
-| `NEXT_PUBLIC_WS_URL` | GitHub secret → Docker build-arg |
-| `NEXT_PUBLIC_HLS_BASE` | GitHub secret → Docker build-arg |
-| `NEXT_PUBLIC_PROJECT_PREFIX` | hardcoded ใน workflow |
+| `SERVER_HOST` | hostname/IP UAT server |
+| `SERVER_USER` | SSH user (เช่น `deploy`) |
+| `SERVER_PORT` | SSH port (default 22) — optional |
+| `SSH_PRIVATE_KEY` | private key (PEM full content) |
+| `COMPOSE_PATH` | path บน server เช่น `/home/deploy/smart-pole` |
+| `DATABASE_URL` | `postgresql://USER:PASS@host:5432/db_uat` |
+| `JWT_SECRET` | random ≥ 32 chars |
+| `MQTT_USERNAME` | backend MQTT subscriber username |
+| `MQTT_PASSWORD` | backend MQTT subscriber password |
+| `SRS_DVR_TOKEN` | shared secret กับ SRS callback |
 
-> **สำคัญ:** Next.js inline `NEXT_PUBLIC_*` ตอน build — ต้อง rebuild image ถ้า URL เปลี่ยน
+### Environment `production` — Secrets
+
+ตัวเดียวกันแต่ใช้ค่า production:
+
+| Name | คำอธิบายเพิ่มเติม |
+|---|---|
+| `SERVER_HOST` | production hostname |
+| `SERVER_USER` | SSH user |
+| `SERVER_PORT` | SSH port |
+| `SSH_PRIVATE_KEY` | **แยกจาก UAT** |
+| `COMPOSE_PATH` | path บน production |
+| `DATABASE_URL` | production DB |
+| `JWT_SECRET` | **ต่างจาก UAT** — random ≥ 32 chars |
+| `MQTT_USERNAME` | production username |
+| `MQTT_PASSWORD` | production password |
+| `SRS_DVR_TOKEN` | production shared secret |
 
 ---
 
-## 4. Branch Protection (Settings → Branches)
+## 5. วิธีที่ workflow ใช้ secrets/vars
+
+```yaml
+# Build args (ตอน Docker build)
+build-args: |
+  NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}      # 🟢 vars
+  NEXT_PUBLIC_PROJECT_PREFIX=${{ vars.NEXT_PUBLIC_PROJECT_PREFIX }}
+
+# SSH script — สร้าง backend/.env on-the-fly
+cat > backend/.env << EOF
+NODE_ENV=production
+DATABASE_URL=${{ secrets.DATABASE_URL }}                   # 🔴 secret
+JWT_SECRET=${{ secrets.JWT_SECRET }}
+JWT_ACCESS_EXPIRES=${{ vars.JWT_ACCESS_EXPIRES || '15m' }} # 🟢 vars
+CORS_ORIGIN=${{ vars.CORS_ORIGIN }}
+MQTT_USERNAME=${{ secrets.MQTT_USERNAME }}                 # 🔴 secret
+MQTT_PASSWORD=${{ secrets.MQTT_PASSWORD }}
+LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
+EOF
+```
+
+> **กฎ:** ค่าใดก็ตามที่ frontend bundle (`NEXT_PUBLIC_*`) จะถูก inline ลง JS — ใส่ `vars` ไม่ต้อง secret
+> ค่าอะไรที่ใช้ฝั่ง backend หรือ login ที่ host — ใช้ `secrets`
+
+---
+
+## 6. Branch Protection (Settings → Branches)
 
 ### `main`
 - ✅ Require pull request before merging
 - ✅ Require approvals: **1**
-- ✅ Dismiss stale reviews on new commits
-- ✅ Require status checks: `Backend · typecheck + test`, `Frontend · typecheck`, `Secret leak scan (gitleaks)`
-- ✅ Require branches up to date before merging
-- ❌ Allow force pushes
-- ❌ Allow deletions
-- ❌ Allow bypass
+- ✅ Require status checks: `Backend · typecheck + test`, `Frontend · typecheck`, `Secret leak scan`
+- ✅ Require branches up to date
+- ❌ Allow force pushes / deletions
 
 ### `uat-dev`
-- ✅ Require pull request (จาก feature branches)
-- ✅ Require status checks: เหมือน main
+- ✅ Require status checks (เหมือน main)
 - ❌ Allow force pushes
 
 ---
 
-## 5. Pre-flight Checklist ก่อน enable workflow
+## 7. Pre-flight Checklist
 
 ```bash
-# 1. Lockfile ครบ
-ls backend/bun.lock frontend/bun.lock                              # ทั้งคู่ต้องมี
-
-# 2. ไม่มี .env หลุด history
+# 1. ไม่มี .env หลุด history
 git log --all --full-history -- backend/.env frontend/.env.local   # ต้องว่าง
 
-# 3. .gitignore ครอบคลุม secret
+# 2. .gitignore ครอบคลุม secret
 git check-ignore .env .env.production secrets/                      # ต้อง print path
 
-# 4. Docker build ผ่าน
+# 3. Docker build ผ่าน (local test)
 docker build -t test backend/
 docker build -t test frontend/ \
   --build-arg NEXT_PUBLIC_API_URL=http://localhost:7766 \
@@ -165,76 +159,104 @@ docker build -t test frontend/ \
   --build-arg NEXT_PUBLIC_HLS_BASE=http://localhost:7780 \
   --build-arg NEXT_PUBLIC_PROJECT_PREFIX=smart-pole-test
 
-# 5. TypeScript + test pass
+# 4. TypeScript + test pass
 cd backend && bunx tsc --noEmit && bun test --pattern '*.service.test.ts'
 cd frontend && bunx tsc --noEmit
 ```
 
 ---
 
-## 6. ขั้นตอน First Deploy (UAT)
+## 8. First Deploy (UAT)
 
 ```bash
 # บน UAT host
 ssh deploy@uat.smart-pole.example.com
-
-mkdir -p /home/deploy/smart-pole/backups
+mkdir -p /home/deploy/smart-pole/data/{uploads,recordings,mosquitto/{data,log}}
 cd /home/deploy/smart-pole
 
-# 1. ใส่ .env ของ backend + frontend (ใช้ template เป็นแบบ)
-nano backend/.env             # คัด backend/.env.uat.example
-nano frontend/.env.local      # คัด frontend/.env.uat.example
-
-# 2. เตรียม mosquitto password file
+# Mosquitto password file (production auth)
 docker run --rm -v $(pwd)/infra/mosquitto/config:/mosquitto/config \
   eclipse-mosquitto:2 mosquitto_passwd -b -c /mosquitto/config/passwordfile \
   backend-subscriber __PASSWORD__
 
-# 3. Login docker
-docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_TOKEN
-
-# 4. Push branch uat-dev → workflow รันอัตโนมัติ
+# จากนั้น push branch uat-dev → workflow รันอัตโนมัติ
+# workflow จะสร้าง backend/.env บน server เอง
 ```
 
 ---
 
-## 7. Rollback
+## 9. Rollback
 
 ```bash
-# ใช้ image tag เดิม (workflow tag = uat-{sha} / prod-{sha})
 ssh deploy@host
-cd /opt/smart-pole
-export IMAGE_TAG=prod-<previous-sha>
-docker compose pull && docker compose up -d --force-recreate
+cd /home/deploy/smart-pole
+
+# Pull image tag เก่า (workflow ใช้ tag = uat-dev / prod-latest, แต่ build cache มี SHA)
+# วิธี: rerun workflow เดิม (Actions → re-run) หรือ
+docker compose pull
+docker compose up -d --force-recreate
 ```
 
 ---
 
-## 8. Workflows ในโปรเจค
+## 10. Workflows
 
 | ไฟล์ | trigger | จุดประสงค์ |
 |---|---|---|
-| `.github/workflows/ci.yml` | push/PR ทุก branch | typecheck + test + secret scan |
-| `.github/workflows/uat-dev.yml` | push to `uat-dev` | build → push → deploy UAT |
-| `.github/workflows/production.yml` | push to `main` (manual approval) | build → backup DB → migrate → deploy production |
+| `.github/workflows/ci.yml` | push/PR ทุก branch | typecheck + test + gitleaks |
+| `.github/workflows/uat-dev.yml` | push to `uat-dev` | path-filter + build + deploy + Discord |
+| `.github/workflows/production.yml` | push to `main` (manual approval) | build + DB backup + migrate + deploy |
 | `.github/dependabot.yml` | weekly | npm + docker + actions updates |
 
 ---
 
-## 9. Monitoring Post-Deploy
+## 11. Discord Notification
 
-หลัง deploy ควรเช็ค:
+Webhook ส่ง notification ที่:
+- 🔵 Build Started
+- 🟣 Deploying
+- 🟢 Deploy Completed
+- 🔴 Deploy Failed (พร้อม FAILED_STEP)
+
+ตั้ง `DISCORD_WEBHOOK` เป็น Repository Secret (ไม่ต้องแยก env)
+
+---
+
+## 12. Mosquitto + SRS Streaming (เพิ่มเติมจาก PMK)
+
+โปรเจคนี้รวม services นอกจาก backend/frontend:
+
+### Mosquitto MQTT broker
+- Image: `eclipse-mosquitto:2`
+- Port: `1883` (TCP) + `9001` (WebSocket)
+- Config: `infra/mosquitto/config/mosquitto.conf` (commit ใน repo)
+- ACL: `infra/mosquitto/config/aclfile` (commit ใน repo)
+- Password: `infra/mosquitto/config/passwordfile` (✋ **gitignored** — workflow generate ครั้งแรก)
+
+### SRS streaming server
+- Image: `ossrs/srs:5`
+- Port: `1935` (RTMP ingest) + `8080` (HLS playback) + `1985` (HTTP API)
+- Config: `infra/srs/srs.conf` (commit ใน repo)
+- Recordings: `data/recordings/` (volume — gitignored)
+
+### Workflow handles automatically:
+
+1. **First deploy:** สร้าง Mosquitto password file จาก secret `MQTT_USERNAME`/`MQTT_PASSWORD`
+2. **ทุก deploy:** SCP `infra/` → server, แล้วส่ง `SIGHUP` ให้ Mosquitto + SRS reload config (ไม่ต้อง restart)
+3. **Health check:** ตรวจ Mosquitto port 1883 + SRS HTTP API port 1985 (ผ่าน `vars.SRS_API_PORT`)
+4. **Volume permissions:** `chmod -R 777` ให้ `data/{uploads,recordings,mosquitto/{data,log}}` (เฉพาะ host volume)
+
+### หากต้องเปลี่ยน Mosquitto password ระหว่าง runtime:
 
 ```bash
-# Health
-curl -fsS https://api-uat.smart-pole.example.com/health/ready
+# update secret ใน GitHub
+# rerun workflow → จะ overwrite passwordfile (ไม่สร้างใหม่)
+```
 
-# Logs
-docker compose logs -f --tail 100 backend frontend
+### หากต้องลบ Mosquitto password file (force regenerate):
 
-# DB migrations applied
-docker compose run --rm backend bunx prisma migrate status --config prisma/prisma.config.ts
-
-# MQTT broker accepting connections
-mosquitto_sub -h broker -p 1883 -u backend-subscriber -P "$MQTT_PASSWORD" -t '$SYS/broker/uptime' -C 1
+```bash
+ssh deploy@host
+rm /home/deploy/smart-pole/infra/mosquitto/config/passwordfile
+# rerun workflow
 ```
