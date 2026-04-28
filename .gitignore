@@ -7,6 +7,20 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.env.production
+.env.uat
+.env.staging
+*.pem
+*.key
+id_rsa*
+*-secret.*
+secrets/
+
+# Local-only configs (อาจมี credential)
+mosquitto-local.conf
+infra/mosquitto/passwordfile
+infra/mosquitto/passwd
+infra/mosquitto/acl.production
 
 # Build output
 dist/

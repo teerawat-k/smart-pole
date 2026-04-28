@@ -42,7 +42,7 @@ services:
 
   # ─── Backend (Bun + Elysia) ────────────────────────────────────────────────
   backend:
-    image: teerawatk/smart-pole-backend:latest
+    image: ${DOCKERHUB_USERNAME:-teerawatk}/smart-pole-backend:${IMAGE_TAG:-latest}
     container_name: smart-pole-backend
     restart: unless-stopped
     build:
@@ -82,7 +82,7 @@ services:
 
   # ─── Frontend (Next.js) ────────────────────────────────────────────────────
   frontend:
-    image: teerawatk/smart-pole-frontend:latest
+    image: ${DOCKERHUB_USERNAME:-teerawatk}/smart-pole-frontend:${IMAGE_TAG:-latest}
     container_name: smart-pole-frontend
     restart: unless-stopped
     build:

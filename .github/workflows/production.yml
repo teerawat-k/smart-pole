@@ -1,18 +1,17 @@
-name: UAT-Dev · Build + Deploy
+name: Production · Build + Deploy
 
 on:
   push:
-    branches: [uat-dev]
+    branches: [main]
   workflow_dispatch:
 
 env:
   REGISTRY: docker.io
   BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/smart-pole-backend
   FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/smart-pole-frontend
-  IMAGE_TAG: uat-${{ github.sha }}
+  IMAGE_TAG: prod-${{ github.sha }}
 
 jobs:
-  # ─── Quality gates (parallel) ────────────────────────────
   backend-check:
     name: Backend · typecheck + test
     runs-on: ubuntu-latest
@@ -45,9 +44,8 @@ jobs:
       - working-directory: frontend
         run: bunx tsc --noEmit
 
-  # ─── Build + Push images ─────────────────────────────────
   build-and-push:
-    name: Build & push Docker images
+    name: Build & push images
     needs: [backend-check, frontend-check]
     runs-on: ubuntu-latest
     steps:
@@ -58,66 +56,73 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build & push backend
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: true
           tags: |
             ${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}
-            ${{ env.BACKEND_IMAGE }}:uat-latest
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,scope=backend,mode=max
+            ${{ env.BACKEND_IMAGE }}:prod-latest
+          cache-from: type=gha,scope=backend-prod
+          cache-to: type=gha,scope=backend-prod,mode=max
 
-      - name: Build & push frontend
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: true
           tags: |
             ${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}
-            ${{ env.FRONTEND_IMAGE }}:uat-latest
+            ${{ env.FRONTEND_IMAGE }}:prod-latest
           build-args: |
-            NEXT_PUBLIC_API_URL=${{ secrets.UAT_NEXT_PUBLIC_API_URL }}
-            NEXT_PUBLIC_WS_URL=${{ secrets.UAT_NEXT_PUBLIC_WS_URL }}
-            NEXT_PUBLIC_HLS_BASE=${{ secrets.UAT_NEXT_PUBLIC_HLS_BASE }}
-            NEXT_PUBLIC_PROJECT_PREFIX=smart-pole-uat
-          cache-from: type=gha,scope=frontend
-          cache-to: type=gha,scope=frontend,mode=max
+            NEXT_PUBLIC_API_URL=${{ secrets.PROD_NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_WS_URL=${{ secrets.PROD_NEXT_PUBLIC_WS_URL }}
+            NEXT_PUBLIC_HLS_BASE=${{ secrets.PROD_NEXT_PUBLIC_HLS_BASE }}
+            NEXT_PUBLIC_PROJECT_PREFIX=smart-pole
+          cache-from: type=gha,scope=frontend-prod
+          cache-to: type=gha,scope=frontend-prod,mode=max
 
-  # ─── Deploy to UAT host (SSH + docker compose) ──────────
-  deploy-uat:
-    name: Deploy → UAT
+  deploy:
+    name: Deploy → Production
     needs: build-and-push
     runs-on: ubuntu-latest
-    environment: uat-dev
+    environment: production   # ⚠️ ตั้ง required reviewers ใน GitHub Settings
     steps:
       - uses: actions/checkout@v4
 
-      - name: Copy compose files to UAT host
+      - name: Copy compose to host
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.UAT_HOST }}
-          username: ${{ secrets.UAT_USER }}
-          key: ${{ secrets.UAT_SSH_KEY }}
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
           source: "docker-compose.yml,infra/"
-          target: "${{ secrets.UAT_DEPLOY_PATH }}"
+          target: "${{ secrets.PROD_DEPLOY_PATH }}"
 
-      - name: Pull, migrate & restart
+      - name: Backup DB + migrate + restart
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.UAT_HOST }}
-          username: ${{ secrets.UAT_USER }}
-          key: ${{ secrets.UAT_SSH_KEY }}
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
           script: |
             set -e
-            cd ${{ secrets.UAT_DEPLOY_PATH }}
+            cd ${{ secrets.PROD_DEPLOY_PATH }}
+
+            # 1) Backup DB ก่อน migrate
+            ts=$(date +%Y%m%d-%H%M%S)
+            pg_dump "$DATABASE_URL" | gzip > "backups/smart_pole_${ts}.sql.gz"
+
+            # 2) Pull new images
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-            export IMAGE_TAG=uat-latest
+            export IMAGE_TAG=prod-latest
             docker network create smart-pole-network 2>/dev/null || true
             docker compose pull
+
+            # 3) Migrate (idempotent — Prisma migrate deploy)
             docker compose run --rm backend bunx prisma migrate deploy --config prisma/prisma.config.ts
+
+            # 4) Rolling restart + health check
             docker compose up -d --force-recreate
-            sleep 10
-            curl -fsS http://localhost:7766/health/ready || (docker compose logs backend --tail 50 && exit 1)
+            sleep 15
+            curl -fsS http://localhost:7766/health/ready || (docker compose logs backend --tail 100 && exit 1)
             docker compose ps
