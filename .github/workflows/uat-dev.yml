@@ -160,17 +160,9 @@ jobs:
             mkdir -p data/uploads data/recordings data/mosquitto/data data/mosquitto/log
             chmod -R 777 data 2>/dev/null || true
 
-            # ─── Mosquitto: bootstrap password file (idempotent) ─────────────
-            echo "🔐 Bootstrap Mosquitto credentials..."
-            mkdir -p infra/mosquitto/config
-            MOSQ_FLAG=""
-            [ ! -f infra/mosquitto/config/passwordfile ] && MOSQ_FLAG="-c"
-            docker run --rm -v "$DEPLOY_DIR/infra/mosquitto/config:/mosquitto/config" \
-              eclipse-mosquitto:2 mosquitto_passwd -b $MOSQ_FLAG /mosquitto/config/passwordfile \
-              "${{ secrets.MQTT_USERNAME }}" "${{ secrets.MQTT_PASSWORD }}"
-            chmod 0700 infra/mosquitto/config/passwordfile
-
             # ─── Mosquitto + SRS: ensure running + reload config ────────────
+            # NOTE: UAT uses anonymous mode (mosquitto.conf: allow_anonymous true).
+            # For production, generate passwordfile manually on the host.
             echo "🦟 Ensuring Mosquitto running..."
             docker compose up -d mosquitto
             docker compose kill -s HUP mosquitto 2>/dev/null || true   # reload conf without restart
