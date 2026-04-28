@@ -7,7 +7,17 @@ export interface ClipItem {
   modifiedAt: string;
 }
 
+export interface LatestClip extends ClipItem {
+  date: string; // YYYY-MM-DD
+}
+
 export const cameraClipApi = {
+  getLatest: async (poleName: string) => {
+    const res = await apiClient.get<{ success: true; data: LatestClip | null }>(
+      `/api/cameras/${encodeURIComponent(poleName)}/latest`,
+    );
+    return res.data.data;
+  },
   listClips: async (poleName: string, date: string) => {
     const res = await apiClient.get<{ success: true; data: ClipItem[] }>(
       `/api/cameras/${encodeURIComponent(poleName)}/clips`,

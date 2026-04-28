@@ -8,7 +8,7 @@ import { AppDatePicker } from "@/components/layout/app-date-picker";
 import { Wifi, WifiOff, Wrench, Antenna, Video } from "lucide-react";
 import { usePoleLookup } from "@/hooks/api/use-poles";
 import { useSensorLatest } from "@/hooks/api/use-sensors";
-import { useClipList } from "@/hooks/api/use-camera-clips";
+import { useClipList, useLatestClip } from "@/hooks/api/use-camera-clips";
 import { cameraClipApi } from "@/lib/api/camera-clip";
 import { env } from "@/config/env";
 import type { PoleStatus } from "@/lib/api/pole";
@@ -81,20 +81,43 @@ export default function DashboardPage() {
   // ── Camera clip picker (date + file) ────────────────────
   const [clipDate, setClipDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [clipFile, setClipFile] = useState<string | null>(null);
+  // เปลี่ยนเสาแล้วต้องรอ "latest" hint มา set ก่อนถึง list — กัน list เก่ากระโดดเลือก auto
+  const [hydratedFromLatest, setHydratedFromLatest] = useState(false);
 
-  const clips = useClipList(selected?.hasCamera ? selected.poleName : null, clipDate);
+  const cameraPoleName = selected?.hasCamera ? selected.poleName : null;
+  const latest = useLatestClip(cameraPoleName);
+  const clips = useClipList(cameraPoleName, clipDate);
 
-  // เปลี่ยนเสา/วันที่ → reset ไฟล์
+  // เปลี่ยนเสา → reset ทุกอย่าง รอ latest มา
   useEffect(() => {
     setClipFile(null);
-  }, [selectedId, clipDate]);
+    setHydratedFromLatest(false);
+  }, [selectedId]);
 
-  // clips โหลดมา → เลือกไฟล์ใหม่สุด
+  // latest โหลดมา → set date+file ของไฟล์ล่าสุด (รอบเดียวต่อการเปลี่ยนเสา)
   useEffect(() => {
+    if (!hydratedFromLatest && latest.data) {
+      setClipDate(latest.data.date);
+      setClipFile(latest.data.filename);
+      setHydratedFromLatest(true);
+    } else if (!hydratedFromLatest && latest.isFetched && !latest.data) {
+      // ไม่มีไฟล์เลย — mark hydrated แต่คงค่า date เป็นวันนี้, file = null
+      setHydratedFromLatest(true);
+    }
+  }, [latest.data, latest.isFetched, hydratedFromLatest]);
+
+  // ผู้ใช้เปลี่ยนวันด้วยตนเอง (หลัง hydrated) → reset file + auto-select ไฟล์ใหม่สุดของวันนั้น
+  useEffect(() => {
+    if (!hydratedFromLatest) return;
+    setClipFile(null);
+  }, [clipDate, hydratedFromLatest]);
+
+  useEffect(() => {
+    if (!hydratedFromLatest) return;
     if (clips.data && clips.data.length > 0 && clipFile === null) {
       setClipFile(clips.data[0]!.filename);
     }
-  }, [clips.data, clipFile]);
+  }, [clips.data, clipFile, hydratedFromLatest]);
 
   const fileOptions = useMemo(
     () => (clips.data ?? []).map((c) => ({ id: c.filename, label: c.filename })),

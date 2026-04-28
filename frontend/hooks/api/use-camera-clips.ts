@@ -10,3 +10,11 @@ export function useClipList(poleName: string | null, date: string | null) {
     enabled: !!poleName && !!date,
   });
 }
+
+export function useLatestClip(poleName: string | null) {
+  return useQuery({
+    queryKey: ["camera-clip", "latest", poleName],
+    queryFn: () => cameraClipApi.getLatest(poleName!),
+    enabled: !!poleName,
+  });
+}

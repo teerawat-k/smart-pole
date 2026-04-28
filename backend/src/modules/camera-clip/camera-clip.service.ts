@@ -36,7 +36,28 @@ export interface ClipItem {
   modifiedAt: string;  // ISO
 }
 
+export interface LatestClip extends ClipItem {
+  date: string;       // YYYY-MM-DD
+}
+
 export const cameraClipService = {
+  /** หา clip ใหม่สุดข้ามทุกวัน — ไล่จาก folder วันที่ใหม่สุดก่อน */
+  async getLatestClip(poleName: string): Promise<LatestClip | null> {
+    assertPoleName(poleName);
+    const root = poleRoot(poleName);
+    const entries = await safeReaddir(root);
+    if (!entries) return null;
+
+    const dates = entries.filter((e) => DATE_RE.test(e)).sort((a, b) => b.localeCompare(a));
+    for (const date of dates) {
+      const items = await this.listClips(poleName, date);
+      if (items.length > 0) {
+        return { ...items[0]!, date };
+      }
+    }
+    return null;
+  },
+
   /** คืนรายการไฟล์ใน folder วันที่ — sorted ใหม่ → เก่า ตาม mtime */
   async listClips(poleName: string, date: string): Promise<ClipItem[]> {
     assertPoleName(poleName);
