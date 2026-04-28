@@ -89,8 +89,6 @@ services:
       context: ./frontend
     ports:
       - '7765:7765'
-    env_file:
-      - ./frontend/.env.local
     environment:
       TZ: Asia/Bangkok
       NODE_ENV: production
