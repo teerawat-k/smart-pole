@@ -5,6 +5,51 @@
 
 ---
 
+## 2026-04-28 · Refactor MQTT + Sensor schema + ER cleanup
+
+### แก้ไข (Backend / Schema)
+- รวม sensor 4 table (`SensorPm25`, `SensorTemperature`, `SensorHumidity`, `SensorHeartbeatSignal`) → `SensorReading` flat table เดียว (id auto-increment)
+- รวม `PoleLatestReading` table เข้าเป็น column ใน `Pole` (`latestSeq`, `latestPm25`, `latestTemperature`, `latestHumidity`, `latestReadingAt`)
+- เปลี่ยน `Pole.lastSeenAt` + `SensorReading.time` + `Pole.latestReadingAt` จาก `DateTime` → `BigInt` (เก็บ raw epoch จากเสา ไม่แปลง — frontend แปลง timezone เอง)
+- ลบ table ที่ไม่ใช้: `SensorType`, `SensorUnknown`, `SystemConfig`, `PoleLatestReading`
+- ลบ seed `sensor-types.ts` + module `system-config`
+- เพิ่ม FK ครบทั้ง schema (Restrict สำหรับ master, SetNull สำหรับ audit, Cascade สำหรับ Pole children)
+- ยุบ migrations เก่าทั้งหมดเป็น `0_init` เดียว (PascalCase table names, ไม่ใช้ `@@map`)
+- กฎใหม่: **ห้ามใช้ `@@map`** — table name ตรงกับ Prisma model name (เพิ่มใน `backend/CLAUDE.md`)
+
+### แก้ไข (MQTT)
+- Topic เหลือ `smartpole/sensor` topic เดียว (ตัด `heartbeat`, `event` ออก)
+- `pole_name` ย้ายจาก topic → payload
+- `timestamp` รับเป็น Unix epoch (number) — รองรับทั้ง seconds/milliseconds
+- ตัด drift check (5 นาที) ออก — เก็บ raw timestamp
+- ตัดฟิลด์ที่ไม่ใช้: `aqi`, `pm10`, `signal_dbm`, `uptime_sec`, `firmware`, `schemaVersion`
+- Payload required: `pole_name`, `timestamp`, `seq` + optional: `pm25`, `temperature`, `humidity`
+- ลบ `handle-heartbeat.ts`, `handle-event.ts`, `sensor-registry.ts` + 3 sensor handler modules
+- offline threshold ย้ายจาก SystemConfig → env `POLE_OFFLINE_THRESHOLD_MINUTES` (default 5 นาที)
+
+### เพิ่ม (Security)
+- Security headers middleware (Helmet equivalent): X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, COOP/CORP, HSTS (prod), CSP (prod)
+- Rate limit middleware (in-memory fixed window): `POST /api/auth/login` 10/min, `POST /api/auth/refresh` 20/min ต่อ IP
+
+### เพิ่ม (Seed)
+- 10 poles: `pole-01` ถึง `pole-10` (เปลี่ยนจาก `test-001`/`test-002`)
+- admin user เปลี่ยนเป็น `createdBy = null` (initial seed)
+
+### แก้ไข (Frontend)
+- หน้า Sensor: ใช้ DataTable มาตรฐาน + sortable + auto-select เสาแรก + pagination (ลบ date picker + sensor type combobox)
+- หน้า Dashboard: ตัดเรียกใช้ `useSensorTypes` + อ่าน `latest*` fields ตรงจาก Pole + แสดงเวลาข้อมูลล่าสุด
+- DataTable base: text สีดำ 14px ทุกตาราง
+- Tabs: cursor-pointer
+- POLE_LOOKUP_SELECT เพิ่ม `poleStatus` + `lastSeenAt` (แก้บั๊ก Dashboard แสดงสถานะผิด)
+
+### ยกเลิก
+- Topic `smartpole/{poleName}/heartbeat` (รวมเข้า sensor)
+- Topic `smartpole/{poleName}/event` (ระบบสร้าง alert จาก backend แทน)
+- Module `system-config` (เปลี่ยนเป็น env ตามที่ใช้จริง)
+- `alertService.createFromMqtt()` (ไม่มี caller แล้ว)
+
+---
+
 ## 2026-04-28 · Backend + Frontend MVP complete
 
 ### เพิ่ม (Backend)

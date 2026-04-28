@@ -4,6 +4,27 @@
 
 ---
 
+## 2026-04-28 · ยุบ MQTT topic + รวม sensor table + ใช้ epoch timestamp
+
+- **สถานการณ์:** topic เดิมแยก 3 (`sensor`/`heartbeat`/`event`) + sensor data 4 table + payload nested + drift check ทำให้ ingress ซับซ้อนเกินจำเป็น สำหรับเสาที่ส่งแค่ค่าวัด 3 ตัว
+- **ตัดสินใจ:**
+  1. เหลือ topic เดียว `smartpole/sensor` — `pole_name` อยู่ใน payload
+  2. flat payload: `{ pole_name, timestamp, seq, pm25?, temperature?, humidity? }`
+  3. รวม 4 sensor table → `SensorReading` เดียว (id auto-increment)
+  4. รวม `PoleLatestReading` → column ใน `Pole` (`latest*`)
+  5. เปลี่ยน `timestamp` รับ Unix epoch number — ไม่มี drift check
+  6. heartbeat ตัดออกหมด — ใช้ `lastSeenAt` + cron scan
+- **เหตุผล:** spec ระบบจริงจากเสาส่ง 3 ค่ากับ seq เท่านั้น — schema เก่า over-engineered + JOIN เยอะตอน query latest
+- **ผลที่ตามมา:** ลด table จาก ~20 → 12, ลด module จาก 13 → 9, integration test 5/5 pass, ลด complexity ของ MQTT ingest มาก
+
+## 2026-04-28 · ห้ามใช้ `@@map` — table name = model name
+
+- **สถานการณ์:** schema เดิมใช้ `@@map("snake_case")` mix กับ PascalCase model — Prisma client gen mapping มั่ว ตอนเพิ่ม model ใหม่ไม่มี `@@map` แล้ว query ผิด table
+- **ตัดสินใจ:** ลบ `@@map` ทั้งหมด — table name ตรงกับ Prisma model name (PascalCase) ทุกตัว
+- **ผลที่ตามมา:** ยุบ migrations เป็น `0_init` เดียว, เพิ่มกฎใน `backend/CLAUDE.md` ว่าห้ามใช้ `@@map` ในอนาคต
+
+---
+
 ## 2026-04-27 · MQTT offline detection ย้ายจาก in-memory → Postgres + cron
 
 - **สถานการณ์:** ระบบเดิมใช้ `setTimeout` map in-memory — restart server = state หาย, scale-out ไม่ได้

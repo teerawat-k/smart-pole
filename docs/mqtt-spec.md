@@ -1,196 +1,241 @@
 # MQTT Spec
 
-> สเปคของ topic + payload ที่ใช้ระหว่างเสาสัญญาณ ↔ backend
-> Broker: Mosquitto 2 (MQTT 5) — auth ด้วย username/password + ACL per pole (planned)
+> สเปคของ topic + payload สำหรับเสาสัญญาณ (และระบบภายนอก) ส่งข้อมูลเข้า Smart Pole backend
+> Broker: Mosquitto 2 (รองรับ MQTT 5)
 
 ---
 
-## 1. Topic Naming
+## 1. ภาพรวม
 
-```
-smartpole/{poleName}/{messageType}
-```
+ระบบรับข้อมูลจากเสาเซนเซอร์ผ่าน MQTT broker แล้ว backend จะ:
+- บันทึก time-series ลงตาราง `SensorReading` (ทุก packet)
+- อัปเดตค่าล่าสุด + สถานะ online ลงตาราง `Pole` (overwrite)
+- ส่งสัญญาณผ่าน WebSocket ให้ frontend อัปเดตหน้าจอแบบเรียลไทม์
 
-- `poleName` = `Pole.poleName` (unique ใน DB) — ห้ามเว้นวรรค, kebab-case แนะนำ
-- `messageType` = `sensor` | `heartbeat` | `alert` | `command` (downstream — phase 2)
+มี topic เดียวที่ระบบใช้ในตอนนี้: **`smartpole/sensor`** — `pole_name` อยู่ใน payload (ไม่อยู่ในชื่อ topic)
 
 ---
 
-## 2. Topics (upstream — เสา → backend)
+## 2. การเชื่อมต่อ Broker
 
-### 2.1 `smartpole/{poleName}/sensor`
-
-| Property | Value |
+| รายการ | ค่า |
 |---|---|
+| Host (dev) | `localhost` |
+| TCP Port | `1883` (plain) — production ควรใช้ TLS 8883 |
+| WebSocket Port | `9001` |
+| Protocol | MQTT 5 (`protocolVersion: 5`) |
+| Auth | username/password (dev: anonymous เปิดได้ — production บังคับ auth) |
+| Keep-alive | แนะนำ 60 วินาที |
+| Clean session | `true` |
+
+ตัวอย่าง connection string:
+```
+mqtt://username:password@host:1883?clientId=pole-XX
+```
+
+---
+
+## 3. Topic: `smartpole/sensor`
+
+### 3.1 Properties
+
+| รายการ | ค่า |
+|---|---|
+| Direction | upstream (เสา → backend) |
 | QoS | 1 (at-least-once) |
-| Retained | false |
-| Frequency | ทุก 30s (config ได้ที่ฝั่งเสา) |
+| Retained | `false` |
+| Frequency | แนะนำทุก 30 วินาที (config ที่ฝั่งเสา) |
 
-**Payload (JSON):**
+### 3.2 Payload (JSON)
+
+ขั้นต่ำ (required):
 ```json
 {
-  "pole_id": "pole-001",
-  "timestamp": "2026-04-27T10:30:00Z",
-  "pm25": 35.2,
-  "temperature": 28.5,
-  "humidity": 65.0,
-  "seq": 12345
+  "pole_name": "pole-01",
+  "timestamp": 1777348800000,
+  "seq": 1042
 }
 ```
 
-**Validation (refactor — Zod):**
-- `pole_id`: string, ตรงกับ topic
-- `timestamp`: ISO 8601, ห่างจาก server time ≤ 5 min (กัน replay)
-- `pm25` / `temperature` / `humidity`: number, finite
-- `seq`: integer, monotonic per pole (ถ้าน้อยลง = ของเก่า, drop)
-
-**Side effect:**
-- write Influx `sensor_readings` measurement
-- update `pole.lastSeenAt` (อ่อน — ไม่ persist online status เพราะ heartbeat ทำหน้าที่)
-
----
-
-### 2.2 `smartpole/{poleName}/heartbeat`
-
-| Property | Value |
-|---|---|
-| QoS | 0 (fire-and-forget — ส่งบ่อย) |
-| Retained | false |
-| Frequency | ทุก 30s |
-
-**Payload:**
+เต็มรูปแบบ:
 ```json
 {
-  "pole_id": "pole-001",
-  "timestamp": "2026-04-27T10:30:00Z",
-  "status": "online",
-  "signal_dbm": -67,
-  "uptime_sec": 86400
+  "pole_name":   "pole-01",
+  "timestamp":   1777348800000,
+  "seq":         1042,
+  "pm25":        35.2,
+  "temperature": 33.1,
+  "humidity":    74.5
 }
 ```
 
-**Side effect:**
-- update `pole.poleStatus = "online"` + `pole.lastSeenAt = now()`
-- write Influx `pole_heartbeat` measurement
-- reset offline detection timer (persistent — ดู §4)
+### 3.3 ข้อกำหนดของแต่ละฟิลด์
+
+| Field | Type | Required | ข้อกำหนด |
+|---|---|---|---|
+| `pole_name` | string | ✅ | ชื่อเสาที่ลงทะเบียนใน DB (1–64 อักขระ) |
+| `timestamp` | number | ✅ | Unix epoch — รองรับทั้งวินาที (10 หลัก) และมิลลิวินาที (13 หลัก) — backend auto-detect |
+| `seq` | integer | ✅ | ≥ 0 — ลำดับ packet ของเสา (ใช้ตรวจ packet หาย) |
+| `pm25` | number | optional | 0–1000 µg/m³ |
+| `temperature` | number | optional | -40 ถึง 80 °C |
+| `humidity` | number | optional | 0–100 %RH |
+
+> ฟิลด์อื่นที่ส่งมาเกินจะถูกเก็บเฉพาะที่ schema รองรับ (ฟิลด์เกิน = ignore)
+> ❌ ไม่มี: `signalDbm`, `uptimeSec`, `firmware`, `aqi`, `pm10` (ตัดออกใน refactor ล่าสุด)
+
+### 3.4 พฤติกรรมหลังรับข้อความ
+
+หาก validation **ผ่าน**:
+1. `INSERT` 1 row ลง `SensorReading` (มี `id` auto-increment)
+2. `UPDATE Pole` set `latestPm25`, `latestTemperature`, `latestHumidity`, `latestSeq`, `latestReadingAt`, `lastSeenAt = timestamp`, `poleStatus = "online"`
+3. broadcast WebSocket → frontend invalidate query
+
+หาก validation **ไม่ผ่าน**:
+- log warning + ทิ้งข้อความ — ไม่ตอบกลับ ไม่ retry
+- เหตุผลที่พบบ่อย: `pole_name` ไม่ตรงในฐาน, ค่าทิเกินช่วง, JSON ผิด format
+
+> ส่ง `(pole_name, timestamp, seq)` ซ้ำ 2 รอบ → `SensorReading` เก็บ 2 row (history) แต่ `Pole.latest*` overwrite ค่าใหม่ทับเก่า
 
 ---
 
-### 2.3 `smartpole/{poleName}/alert`
+## 4. Offline Detection
 
-| Property | Value |
-|---|---|
-| QoS | 2 (exactly-once — สำคัญ) |
-| Retained | false |
-| Frequency | event-based |
+ระบบไม่ต้องการ topic `heartbeat` แยก — ใช้ `lastSeenAt` ของแต่ละเสาเป็น signal:
 
-**Payload:**
-```json
-{
-  "pole_id": "pole-001",
-  "timestamp": "2026-04-27T10:30:00Z",
-  "alert_type": "pm25_high",
-  "value": 150.5,
-  "threshold": 100.0,
-  "message": "PM2.5 เกินค่ามาตรฐาน"
-}
-```
-
-**Side effect:**
-- create `Alert` row (ผ่าน `alertService.create()` — ไม่เรียก repo ตรง)
-- broadcast WebSocket → frontend invalidate + toast
-- severity: `value > threshold * 1.5` → critical, else warning
-
-**Alert types (enum):**
-- `pm25_high`
-- `temp_high` / `temp_low`
-- `humidity_high` / `humidity_low`
-- `signal_weak`
-- `device_error`
-- `tampering` (กรณีมี sensor ตรวจจับ)
+- ถ้าเสาส่ง `smartpole/sensor` มาเรื่อยๆ → `lastSeenAt` ปรับใหม่ทุกครั้ง
+- Background job (cron `*/1 * * * *`) ตรวจเสาที่ `lastSeenAt < now - threshold` → mark `offline` + สร้าง alert
+- ค่า threshold default = **5 นาที** (ปรับใน env `POLE_OFFLINE_THRESHOLD_MINUTES`)
+- เสาที่ส่งใหม่อีกครั้งจะถูก mark online + auto-resolve alert
 
 ---
 
-### 2.4 Last Will (เพิ่มใหม่ — refactor)
+## 5. ตัวอย่างการเชื่อมต่อจากระบบภายนอก
 
-เสาทุกต้นต้องตั้ง LWT ตอน connect:
+### 5.1 ก่อนเริ่ม
+
+1. **ขอ credential ของเสาจาก admin** — ระบบสร้างให้ตอนสร้างเสาในหน้า "จัดการเสาสัญญาณ" ผ่าน API `POST /api/poles` หรือ `PATCH /api/poles/:id/regenerate-credential`
+2. credential ที่ได้: `mqttUsername` (= `pole-XX`) + `mqttPassword` (random hex 32 byte) — แสดงครั้งเดียว เก็บไว้ฝั่งเสา
+3. ตั้งให้เสา publish เฉพาะ topic `smartpole/sensor` — ACL จะตรวจว่า `pole_name` ใน payload ตรงกับ username ของ MQTT client (production)
+
+### 5.2 ตัวอย่าง Python
+
+```python
+import json, time, paho.mqtt.client as mqtt
+
+client = mqtt.Client(client_id="pole-01", protocol=mqtt.MQTTv5)
+client.username_pw_set("pole-01", "<mqtt-password>")
+client.connect("broker.example.com", 1883, keepalive=60)
+client.loop_start()
+
+while True:
+    payload = {
+        "pole_name":   "pole-01",
+        "timestamp":   int(time.time() * 1000),  # ms epoch
+        "seq":         next_seq(),               # int monotonic
+        "pm25":        read_pm25(),
+        "temperature": read_temp(),
+        "humidity":    read_humidity(),
+    }
+    client.publish("smartpole/sensor", json.dumps(payload), qos=1)
+    time.sleep(30)
 ```
-topic:    smartpole/{poleName}/heartbeat
-payload:  {"pole_id":"…","status":"offline","timestamp":"…"}
-qos:      1
-retain:   false
-```
 
-→ ถ้าเสา disconnect แบบไม่ส่ง DISCONNECT ปกติ broker จะส่ง LWT ให้ backend อัตโนมัติ
-→ backend mark offline ทันที (ไม่ต้องรอ 3 นาที)
+### 5.3 ตัวอย่าง Node.js / Bun
 
----
-
-## 3. Topics (downstream — backend → เสา) — Phase 2
-
-### 3.1 `smartpole/{poleName}/command`
-
-สำหรับสั่งงานเสา (เช่น เปิด/ปิด LED, restart, update config)
-
-**Payload:**
-```json
-{
-  "command_id": "uuid-v4",
-  "command": "led_on",
-  "args": { "color": "red", "duration_sec": 60 },
-  "issued_by": "user-id",
-  "issued_at": "..."
-}
-```
-
-**Ack:** เสาตอบกลับที่ `smartpole/{poleName}/command/ack` ด้วย `command_id` เดียวกัน
-
----
-
-## 4. Offline Detection (refactor strategy)
-
-### ระบบเดิม (มีปัญหา)
 ```ts
-const heartbeatTimers = new Map<string, NodeJS.Timeout>()
-setTimeout(() => markOffline(pole), 3 * 60 * 1000)
-```
-→ restart server = state หาย, scale-out ไม่ได้
+import mqtt from "mqtt";
 
-### ระบบใหม่
-1. ทุก heartbeat → update `pole.lastSeenAt` ใน Postgres
-2. **Scheduled job** (cron `*/1 * * * *`) → query `WHERE lastSeenAt < now() - interval '3 min' AND poleStatus = 'online'` → mark offline + emit alert
-3. รองรับหลาย instance (ใช้ row-lock หรือ leader election ผ่าน Postgres advisory lock)
-4. LWT ของ MQTT จัดการ disconnect แบบเร็ว (graceful)
+const client = mqtt.connect("mqtt://broker.example.com:1883", {
+  clientId:        "pole-01",
+  username:        "pole-01",
+  password:        "<mqtt-password>",
+  protocolVersion: 5,
+  clean:           true,
+});
+
+let seq = 0;
+
+client.on("connect", () => {
+  setInterval(() => {
+    const payload = {
+      pole_name:   "pole-01",
+      timestamp:   Date.now(),
+      seq:         seq++,
+      pm25:        readPm25(),
+      temperature: readTemp(),
+      humidity:    readHumidity(),
+    };
+    client.publish("smartpole/sensor", JSON.stringify(payload), { qos: 1 });
+  }, 30_000);
+});
+```
+
+### 5.4 ตัวอย่าง CLI (mosquitto_pub) สำหรับทดสอบ
+
+```bash
+mosquitto_pub -h localhost -p 1883 \
+  -t "smartpole/sensor" \
+  -m '{"pole_name":"pole-01","timestamp":1777348800000,"seq":1,"pm25":35.2,"temperature":33.1,"humidity":74.5}'
+```
+
+หรือ PowerShell:
+```powershell
+$ts = [int][DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+$json = '{"pole_name":"pole-01","timestamp":' + $ts + ',"seq":1,"pm25":35.2,"temperature":33.1,"humidity":74.5}'
+$json | & "C:\Program Files\mosquitto\mosquitto_pub.exe" -h localhost -p 1883 -t "smartpole/sensor" -l
+```
+
+### 5.5 Subscribe ดู message ทั้งหมด (debug)
+
+```bash
+mosquitto_sub -h localhost -p 1883 -t "smartpole/#" -v
+```
 
 ---
 
-## 5. Auth & ACL (planned)
+## 6. ความปลอดภัย
 
-- ทุกเสามี username/password ต่างกัน (1 pole = 1 credential)
-- ACL: เสา `pole-001` publish ได้แค่ `smartpole/pole-001/+`
-- Backend subscribe ได้ `smartpole/+/+`
-- Plain TCP (1883) สำหรับ dev / TLS (8883) สำหรับ production
+| รายการ | แนวปฏิบัติ |
+|---|---|
+| TLS | production ใช้ port 8883 พร้อม CA cert |
+| Username/password | 1 เสา = 1 credential (ห้ามใช้ร่วม) |
+| Password storage ฝั่งเสา | เก็บใน secure element / env-var ที่ RW เฉพาะ owner |
+| ACL | เสา `pole-XX` ห้าม subscribe; publish ได้เฉพาะ `smartpole/sensor` |
+| Replay protection | ฝั่งเสาส่ง `timestamp` ปัจจุบัน + `seq` monotonic — backend จัดเก็บตามที่ส่ง (ไม่มี drift check แล้ว) |
+| Rate limit | broker ตั้ง `max_inflight_messages` ระดับ pole, backend ไม่ถือ rate limit เพิ่ม |
 
 ---
 
-## 6. Backend MQTT Plugin Architecture (refactor)
+## 7. Backend Plugin Architecture
 
 ```
-src/plugins/mqtt/
-├── client.ts           ─ singleton client + connect + reconnect
-├── subscriber.ts       ─ register topic handlers
-├── schemas/            ─ Zod schema per topic
-│   ├── sensor.schema.ts
-│   ├── heartbeat.schema.ts
-│   └── alert.schema.ts
-└── handlers/           ─ atom handlers (1 topic 1 file)
-    ├── handle-sensor.ts        → call sensorService.write()
-    ├── handle-heartbeat.ts     → call poleService.recordHeartbeat()
-    └── handle-alert.ts         → call alertService.create()
+backend/src/plugins/mqtt/
+├── client.ts                  ─ singleton client + connect + reconnect
+├── parse-topic.ts             ─ parse "smartpole/sensor" → { messageType }
+├── schemas.ts                 ─ Zod schema ของ sensor payload
+├── handlers/
+│   └── handle-sensor.ts       ─ validate → insert SensorReading + update Pole.latest* + broadcast
+├── parse-topic.test.ts
+├── mqtt.integration.test.ts
+└── index.ts                   ─ export start/stop subscriber
 ```
 
-**กฎ:**
-- handler ห้ามเรียก `prisma` ตรง — ผ่าน service เท่านั้น
-- handler validate payload ด้วย Zod ก่อน → ถ้า fail = log + skip (ไม่ throw)
-- service ที่ถูกเรียกจาก MQTT handler ใช้ `userId = SYSTEM_USER_ID` ใน audit log
-- เพิ่ม metric: `mqtt_messages_total{topic, status}` — Prometheus (phase 2)
+**กฎสำคัญ:**
+- handler validate Zod ก่อนทำอะไร — fail = log + skip (ห้าม throw ออก)
+- handler ห้ามเรียก service-level audit/notification ในตัว — แตะ DB ผ่าน Prisma + broadcast ผ่าน plugin
+- service ที่ถูกเรียกใช้ `userId = SYSTEM_USER_ID` (null) เมื่อ audit
+
+---
+
+## 8. การเปลี่ยนแปลงล่าสุด (เทียบกับ spec เดิม)
+
+| เก่า | ใหม่ |
+|---|---|
+| Topic: `smartpole/{poleName}/{sensor\|heartbeat\|alert}` | Topic: `smartpole/sensor` เดียว — `pole_name` ใน payload |
+| `timestamp` เป็น ISO 8601 | `timestamp` เป็น Unix epoch (number) |
+| มี `heartbeat` topic แยก | รวมกับ sensor — ระบบใช้ `lastSeenAt` แทน |
+| มี `alert` topic จากเสา | ระบบสร้าง alert จากฝั่ง backend (offline scan / threshold rule) |
+| Drift check 5 นาที + reject | ไม่มี drift check — เก็บ `timestamp` ตามที่เสาส่ง |
+| `aqi`, `pm10`, `signal_dbm`, `uptime_sec`, `firmware` | ตัดออกจาก schema |
+| มี Last Will (LWT) | ไม่ใช้ — รอ background scan ตรวจ offline |
+| Sensor data แยก 4 table | รวมเป็น `SensorReading` table เดียว (flat) |

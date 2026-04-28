@@ -1,88 +1,81 @@
-# E06 · MQTT plugin + topic schema + handlers
+# E06 · MQTT plugin + topic schema + handler
 
-> Backend MQTT subscriber — connect Mosquitto + validate topic + dispatch handler atoms
+> Backend MQTT subscriber — connect Mosquitto + validate payload + บันทึก SensorReading + อัปเดต Pole.latest*
 > Spec: `docs/mqtt-spec.md`
 
 Priority: 2
-Blocked by: E05, E08-core
-Status: done (T07/T09 ขั้นสูง เลื่อน)
+Blocked by: E05
+Status: done (refactored 2026-04-28)
 
 ## Tasks
 
 | Task | ชื่อ | Status |
 |------|------|--------|
-| T01 | MQTT client + connect + reconnect + auth | done |
+| T01 | MQTT 5 client + connect + reconnect + auth | done |
 | T02 | Topic dispatcher + Zod schema validation | done |
-| T03 | Handler — handle-sensor.ts | done |
-| T04 | Handler — handle-heartbeat.ts | done |
-| T05 | Handler — handle-event.ts (alert hook → E11) | partial |
-| T06 | LWT (last-will) handling | done (heartbeat.status=offline path) |
-| T07 | Backpressure + batch flush | skip (best-effort writes พอ) |
-| T08 | Health check `/health/mqtt` | TODO |
-| T09 | Replay buffer + dead-letter | skip |
-| T10 | Unit tests + integration | done (parse-topic + integration with aedes) |
+| T03 | Handler — handle-sensor.ts (insert + upsert + broadcast) | done |
+| T04 | Integration test ผ่าน Aedes broker / direct handler | done |
+| T05 | Health check `/health/mqtt` | TODO |
+
+## Topic ที่ใช้
+
+```
+smartpole/sensor   (QoS 1, retain false)
+```
+
+ตัด topic เก่าออกหมด: `smartpole/{poleName}/sensor|heartbeat|event` — ใช้ topic เดียว `pole_name` อยู่ใน payload
 
 ## Atomic Structure
 
 ```
-src/plugins/mqtt/
+backend/src/plugins/mqtt/
 ├── client.ts                  singleton + connect + reconnect + dispatch
-├── parse-topic.ts             pure atom + tests
-├── schemas.ts                 Zod (envelope/sensor/heartbeat/event)
-├── sensor-registry.ts         registry pattern
+├── parse-topic.ts             pure atom — รองรับเฉพาะ "smartpole/sensor"
+├── schemas.ts                 Zod sensor schema (flat — pm25/temperature/humidity)
 ├── handlers/
-│   ├── handle-sensor.ts       validate envelope → iterate readings → dispatch by registry
-│   ├── handle-heartbeat.ts    online/offline + signal history + WS broadcast
-│   └── handle-event.ts        TODO(E11) → alertService.createFromMqtt
-├── mqtt.integration.test.ts   real broker + handler integration
-└── index.ts                   register sensor handlers via side-effect imports
+│   └── handle-sensor.ts       validate → insert SensorReading + update Pole.latest*
+├── parse-topic.test.ts
+├── mqtt.integration.test.ts   integration with Aedes broker
+└── index.ts                   export start/stop subscriber
 ```
 
-## Topics
-- `smartpole/+/sensor` (QoS 1) — readings: { pm25, temperature, humidity, ... }
-- `smartpole/+/heartbeat` (QoS 0) — status, signalDbm, uptimeSec
-- `smartpole/+/event` (QoS 2) — eventType, severity, message
+## Payload Schema
+
+Required: `pole_name` (string), `timestamp` (number — Unix epoch s/ms), `seq` (int ≥ 0)
+Optional: `pm25` (0–1000), `temperature` (-40..80), `humidity` (0..100)
+
+ดู `docs/mqtt-spec.md` § 3 — ตัวอย่าง full + minimal + Python/Node sample code
 
 ## Validation
-- envelope: `{ schemaVersion, poleName, timestamp, seq? }`
-- timestamp drift > 300s → reject
-- poleName mismatch (topic vs payload) → reject
-- pole not found → log warn + skip
-- sensor key in registry → validate Zod → write
-- sensor key not in registry → `sensor_unknown` table
-- sensor key validate fail → `sensor_unknown` reason=validation_failed
 
-## Side Effects (per message)
-**Sensor:**
-1. iterate readings → dispatch via `getSensorHandler(key)`
-2. write hypertable
-3. `broadcastSensorReading` (WS)
-4. `poleService.touchLastSeen` (best-effort)
+- Zod parse fail → log warn + skip (ไม่ throw)
+- `pole_name` ไม่อยู่ใน DB → log warn + skip
+- ไม่มี drift check (รับ timestamp ตามที่เสาส่ง)
+- sender ส่งซ้ำ → SensorReading เก็บ 2 row (history) + Pole.latest* overwrite
 
-**Heartbeat:**
-1. status=online → `poleService.recordHeartbeat` + write `sensor_heartbeat_signal`
-2. status=offline (LWT) → `poleService.markOffline`
-3. broadcast pole-status-changed (เฉพาะตอนเปลี่ยน state offline→online)
+## Side Effects (per sensor packet)
 
-**Event:**
-1. TODO(E11): create alert via alertService
-2. broadcast event to all WS clients
+```
+Promise.all([
+  prisma.sensorReading.create(...)   // history log (id auto-increment)
+  prisma.pole.update(...)            // latestSeq, latestPm25, latestTemperature,
+                                     // latestHumidity, latestReadingAt,
+                                     // lastSeenAt = timestamp, poleStatus = "online"
+])
+broadcastSensorReading(poleName, "sensor", msg)  // WS push
+```
 
 ## Test Result
-- parse-topic: 6 unit tests pass
-- mqtt.integration.test.ts: **7 pass / 1 skip / 0 fail**
-  - sensor reading → write 3 tables (pm25/temp/humidity)
-  - poleName mismatch → reject
-  - unknown sensor key → sensor_unknown
-  - validation fail → sensor_unknown reason=validation_failed
-  - fahrenheit → celsius conversion
-  - heartbeat online → status update + signal write
-  - heartbeat offline (LWT) → mark offline
-  - real broker test (aedes) skip — Windows IPv6 connection timing issue
-- All unit tests: **137 pass / 0 fail**
-- Test scripts: `test:unit` (default), `test:integration` (sequential per file)
+
+- `parse-topic.test.ts`: 4 tests pass
+- `mqtt.integration.test.ts`: 5 tests pass
+  - บันทึก SensorReading + update Pole.latest*
+  - reject humidity เกินช่วง
+  - packet ใหม่ overwrite Pole.latest* (history เก็บ 2 row)
+  - reject pole_name ไม่มีใน DB
+  - lastSeenAt ปรับตาม timestamp ของ packet
 
 ## Notes
-- Backpressure (T07) เลื่อน — Postgres direct write ทนได้ (ไม่ใช่ Influx network)
-- Health check (T08) TODO เพิ่ม `/health/mqtt`
-- Replay/DLQ (T09) skip — handler ไม่ throw ที่ไหน, fail ของ sensor key เก็บใน sensor_unknown แล้ว
+- T05 (health check `/health/mqtt`) ยังไม่ได้ทำ
+- Replay/DLQ ไม่จำเป็น — handler ไม่ throw, validation fail = drop เงียบ
+- offline detection อยู่ที่ E07 (background scan) — ไม่ใช่ topic แยก

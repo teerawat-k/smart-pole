@@ -9,10 +9,13 @@
 - 🌫️ ฝุ่น PM2.5
 - 🌡️ อุณหภูมิ + ความชื้น
 - 💡 ควบคุม LED (อนาคต)
-- 💓 Heartbeat (เช็ค active/offline)
-- ⚠️ Alert (sensor เกิน threshold)
+- ⚠️ Alert (offline detect + sensor threshold rule ฝั่ง backend)
 
 ระบบเปิดช่อง MQTT ไว้ให้เสาส่งสัญญาณ → backend subscribe → persist → broadcast → frontend dashboard real-time
+
+> รายละเอียด protocol + payload: `docs/mqtt-spec.md`
+> Topic ที่ใช้: **`smartpole/sensor`** topic เดียว (`pole_name` อยู่ใน payload)
+> Offline detection: ไม่มี heartbeat topic แยก — backend cron scan `Pole.lastSeenAt < now - 5 นาที`
 
 ## ลูกค้า / ผู้ใช้งาน
 
@@ -37,8 +40,8 @@
 
 ✅ ในขอบเขต:
 - 8 หน้าเดิม: Dashboard, Camera Archive, Sensor Archive, My Profile, Role & Permission, User Management, Pole Monitor, System Log
-- MQTT 5 ingress (sensor + heartbeat + alert)
-- Heartbeat-based offline detection (persistent)
+- MQTT 5 ingress (`smartpole/sensor` topic เดียว)
+- Sensor-based offline detection (background cron scan)
 - HLS live stream + DVR recording playback
 - WebSocket realtime push
 - RBAC ระดับ page + action
