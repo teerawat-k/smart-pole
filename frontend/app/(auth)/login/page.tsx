@@ -84,14 +84,14 @@ export default function LoginPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="captcha">รหัสยืนยัน</Label>
-              <div className="flex items-center gap-2">
+              <div className="relative w-full h-20 border rounded bg-white overflow-hidden">
                 {captcha.isLoading || !captcha.data ? (
-                  <div className="h-12 flex-1 bg-muted animate-pulse rounded" />
+                  <div className="absolute inset-0 bg-muted animate-pulse" />
                 ) : (
                   <img
                     src={captcha.data.image}
                     alt="captcha"
-                    className="h-12 flex-1 border rounded bg-white object-fill"
+                    className="absolute inset-0 w-full h-full object-fill"
                   />
                 )}
                 <Button
@@ -101,7 +101,7 @@ export default function LoginPage() {
                   onClick={() => captcha.refetch()}
                   aria-label="โหลด captcha ใหม่"
                   disabled={captcha.isFetching}
-                  className="shrink-0"
+                  className="absolute top-1 right-1 bg-white/80 hover:bg-white"
                 >
                   <RefreshCcw className={`h-4 w-4 ${captcha.isFetching ? "animate-spin" : ""}`} />
                 </Button>
