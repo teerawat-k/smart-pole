@@ -18,17 +18,20 @@ datasource db {
 // ─── Audit Log ────────────────────────────────────────────────────────────
 model AuditLog {
   id        Int      @id @default(autoincrement())
-  userId    Int
+  userId    Int?
   action    String
   module    String
   targetId  Int
   payload   Json?
+  before    Json?
+  after     Json?
   createdAt DateTime @default(now())
+
+  user User? @relation("AuditLogUser", fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([module, targetId])
   @@index([createdAt(sort: Desc)])
-  @@map("audit_logs")
 }
 
 // ─── Permission (master) ──────────────────────────────────────────────────
@@ -46,7 +49,6 @@ model Permission {
   roles RolePermission[]
 
   @@unique([module, action])
-  @@map("permissions")
 }
 
 // ─── Role ─────────────────────────────────────────────────────────────────
@@ -57,7 +59,7 @@ model Role {
   isSystem    Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  createdBy   Int
+  createdBy   Int?
   updatedBy   Int?
   deletedAt   DateTime?
   deletedBy   Int?
@@ -65,8 +67,11 @@ model Role {
   permissions RolePermission[]
   users       User[]
 
+  creator User? @relation("RoleCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updater User? @relation("RoleUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deleter User? @relation("RoleDeleter", fields: [deletedBy], references: [id], onDelete: SetNull)
+
   @@index([deletedAt])
-  @@map("roles")
 }
 
 // ─── Role × Permission ────────────────────────────────────────────────────
@@ -79,7 +84,6 @@ model RolePermission {
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, permissionId])
-  @@map("role_permissions")
 }
 
 // ─── User ─────────────────────────────────────────────────────────────────
@@ -99,7 +103,7 @@ model User {
   mobileNo  String?
 
   roleId Int
-  role   Role @relation(fields: [roleId], references: [id])
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
   status UserStatus @default(active)
 
@@ -113,17 +117,38 @@ model User {
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  createdBy Int
+  createdBy Int?
   updatedBy Int?
   deletedAt DateTime?
   deletedBy Int?
 
   refreshTokens RefreshToken[]
 
+  // self-reference audit
+  creator User?  @relation("UserCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdUsers User[] @relation("UserCreator")
+  updater User?  @relation("UserUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  updatedUsers User[] @relation("UserUpdater")
+  deleter User?  @relation("UserDeleter", fields: [deletedBy], references: [id], onDelete: SetNull)
+  deletedUsers User[] @relation("UserDeleter")
+
+  // back-relations เพื่อให้ Prisma generate FK ครบ
+  auditLogs        AuditLog[]      @relation("AuditLogUser")
+  systemLogs       SystemLog[]     @relation("SystemLogUser")
+  rolesCreated     Role[]          @relation("RoleCreator")
+  rolesUpdated     Role[]          @relation("RoleUpdater")
+  rolesDeleted     Role[]          @relation("RoleDeleter")
+  polesCreated     Pole[]          @relation("PoleCreator")
+  polesUpdated     Pole[]          @relation("PoleUpdater")
+  polesDeleted     Pole[]          @relation("PoleDeleter")
+  alertsResolved   Alert[]         @relation("AlertResolver")
+  recordingsCreated VideoRecording[] @relation("VideoRecordingCreator")
+  recordingsUpdated VideoRecording[] @relation("VideoRecordingUpdater")
+  recordingsDeleted VideoRecording[] @relation("VideoRecordingDeleter")
+
   @@index([deletedAt])
   @@index([roleId])
   @@index([status])
-  @@map("users")
 }
 
 // ─── Refresh Token ────────────────────────────────────────────────────────
@@ -144,7 +169,6 @@ model RefreshToken {
   @@index([userId])
   @@index([family])
   @@index([expiresAt])
-  @@map("refresh_tokens")
 }
 
 // ─── Captcha Attempt ──────────────────────────────────────────────────────
@@ -157,7 +181,6 @@ model CaptchaAttempt {
   createdAt   DateTime @default(now())
 
   @@index([expiresAt])
-  @@map("captcha_attempts")
 }
 
 // ─── System Log ───────────────────────────────────────────────────────────
@@ -167,6 +190,10 @@ enum SystemLogType {
   logout
   captcha_fail
   page_access
+  password_changed
+  password_reset
+  account_locked
+  account_unlocked
 }
 
 model SystemLog {
@@ -181,10 +208,11 @@ model SystemLog {
   detail       Json?
   createdAt    DateTime      @default(now())
 
+  user User? @relation("SystemLogUser", fields: [userId], references: [id], onDelete: SetNull)
+
   @@index([logType])
   @@index([userId])
   @@index([createdAt(sort: Desc)])
-  @@map("system_logs")
 }
 
 // ─── Pole (เสาสัญญาณ) ───────────────────────────────────────────────────
@@ -215,8 +243,15 @@ model Pole {
 
   // Status
   poleStatus    PoleStatus @default(unknown)
-  lastSeenAt    DateTime?
+  lastSeenAt    BigInt?    // raw epoch จากเสา — frontend แปลง timezone เอง
   maintenanceReason String?
+
+  // Latest sensor reading (overwritten ทุก MQTT packet)
+  latestSeq         BigInt?
+  latestPm25        Decimal? @db.Decimal(8, 2)
+  latestTemperature Decimal? @db.Decimal(6, 2)
+  latestHumidity    Decimal? @db.Decimal(5, 2)
+  latestReadingAt   BigInt?
 
   // MQTT credential (per pole, generated by backend)
   mqttUsername     String  @unique
@@ -230,102 +265,33 @@ model Pole {
   deletedAt DateTime?
   deletedBy Int?
 
+  creator User  @relation("PoleCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  updater User? @relation("PoleUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deleter User? @relation("PoleDeleter", fields: [deletedBy], references: [id], onDelete: SetNull)
+
+  readings      SensorReading[]
+  alerts        Alert[]
+  recordings    VideoRecording[]
+
   @@index([poleStatus, lastSeenAt])
   @@index([deletedAt])
-  @@map("poles")
 }
 
-// ─── Sensor Type Master ────────────────────────────────────────────────────
-// ลงทะเบียน sensor type ที่ระบบรู้จัก — เพิ่ม sensor ใหม่ผ่าน seed
-model SensorType {
-  id            Int      @id @default(autoincrement())
-  key           String   @unique // "pm25", "temperature", "humidity", "heartbeat_signal"
-  displayName   String
-  unit          String?
-  tableName     String // "sensor_pm25"
-  chartType     String? // "line" | "bar" | "gauge"
-  chartColor    String?
-  retentionDays Int      @default(365)
-  isEnabled     Boolean  @default(true)
-  // standard audit + soft delete
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  createdBy     Int
-  updatedBy     Int?
-  deletedAt     DateTime?
-  deletedBy     Int?
-
-  @@map("sensor_types")
-}
-
-// ─── Sensor: PM2.5 ─────────────────────────────────────────────────────────
-// 1 sensor type = 1 table — schema เฉพาะ (PM2.5 + PM10 + AQI)
-model SensorPm25 {
-  time       DateTime
-  poleId     Int
-  seq        BigInt
-  pm25       Float
-  pm10       Float?
-  aqi        Int?
-  rawJson    Json?
-  ingestedAt DateTime @default(now())
-
-  @@id([time, poleId])
-  @@index([poleId, time(sort: Desc)])
-  @@map("sensor_pm25")
-}
-
-// ─── Sensor: Temperature ───────────────────────────────────────────────────
-model SensorTemperature {
-  time        DateTime
+// ─── Sensor Reading (flat — 1 row per packet from pole) ───────────────────
+model SensorReading {
+  id          BigInt   @id @default(autoincrement())
+  time        BigInt   // raw epoch จากเสา
   poleId      Int
   seq         BigInt
-  temperature Float // celsius (normalize ก่อน save)
-  unit        String   @default("celsius") // "celsius" | "fahrenheit" (raw payload)
-  rawJson     Json?
+  pm25        Decimal? @db.Decimal(8, 2)
+  temperature Decimal? @db.Decimal(6, 2)
+  humidity    Decimal? @db.Decimal(5, 2)
   ingestedAt  DateTime @default(now())
 
-  @@id([time, poleId])
+  pole Pole @relation(fields: [poleId], references: [id], onDelete: Cascade)
+
   @@index([poleId, time(sort: Desc)])
-  @@map("sensor_temperature")
-}
-
-// ─── Sensor: Humidity ──────────────────────────────────────────────────────
-model SensorHumidity {
-  time       DateTime
-  poleId     Int
-  seq        BigInt
-  humidity   Float // %RH (0..100)
-  rawJson    Json?
-  ingestedAt DateTime @default(now())
-
-  @@id([time, poleId])
-  @@index([poleId, time(sort: Desc)])
-  @@map("sensor_humidity")
-}
-
-// ─── Sensor: Heartbeat Signal ──────────────────────────────────────────────
-model SensorHeartbeatSignal {
-  time           DateTime
-  poleId         Int
-  signalDbm      Int? // -120..0
-  uptimeSec      BigInt?
-  firmwareVersion String?
-  ingestedAt     DateTime @default(now())
-
-  @@id([time, poleId])
-  @@index([poleId, time(sort: Desc)])
-  @@map("sensor_heartbeat_signal")
-}
-
-// ─── System Config (key-value, runtime tunable) ────────────────────────────
-model SystemConfig {
-  key       String   @id
-  value     Json
-  updatedAt DateTime @updatedAt
-  updatedBy Int?
-
-  @@map("system_configs")
+  @@index([poleId, seq])
 }
 
 // ─── Alert ─────────────────────────────────────────────────────────────────
@@ -352,10 +318,12 @@ model Alert {
   triggeredAt  DateTime       @default(now())
   createdAt    DateTime       @default(now())
 
+  pole       Pole  @relation(fields: [poleId], references: [id], onDelete: Cascade)
+  resolvedBy User? @relation("AlertResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
   @@index([poleId, isResolved, triggeredAt(sort: Desc)])
   @@index([severity])
   @@index([alertType])
-  @@map("alerts")
 }
 
 // ─── VideoRecording (camera DVR index) ─────────────────────────────────────
@@ -372,27 +340,17 @@ model VideoRecording {
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  createdBy Int       @default(0)
+  createdBy Int?    // null = SRS callback (no user)
   updatedBy Int?
   deletedAt DateTime?
   deletedBy Int?
 
+  pole    Pole  @relation(fields: [poleId], references: [id], onDelete: Cascade)
+  creator User? @relation("VideoRecordingCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updater User? @relation("VideoRecordingUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deleter User? @relation("VideoRecordingDeleter", fields: [deletedBy], references: [id], onDelete: SetNull)
+
   @@index([poleId, recordedDate(sort: Desc)])
   @@index([deletedAt])
-  @@map("video_recordings")
 }
 
-// ─── Sensor: Unknown (debug) ───────────────────────────────────────────────
-model SensorUnknown {
-  id        BigInt   @id @default(autoincrement())
-  time      DateTime
-  poleId    Int
-  sensorKey String
-  rawJson   Json
-  reason    String // "no_handler" | "validation_failed"
-  ingestedAt DateTime @default(now())
-
-  @@index([sensorKey, time(sort: Desc)])
-  @@index([poleId, time(sort: Desc)])
-  @@map("sensor_unknown")
-}

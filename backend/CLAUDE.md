@@ -220,6 +220,11 @@ export async function <mutationFn>(input, userId) {
 
 ## Prisma
 
+### Table Naming Convention
+
+- **ห้ามใช้ `@@map`** — table name ตรงกับ Prisma model name (PascalCase) ทุกตัว
+- migration SQL ใช้ PascalCase ตาม model name (`"Pole"`, `"User"`, `"SensorReading"` ฯลฯ)
+
 ### Model Convention — ทุก master model ต้องมี
 
 `order Int @default(0)` (ถ้ามี DnD), `deletedAt DateTime?`, `deletedBy Int?`, `createdBy Int`, `updatedBy Int?`, `createdAt DateTime @default(now())`, `updatedAt DateTime @updatedAt`
