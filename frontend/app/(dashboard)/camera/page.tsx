@@ -32,6 +32,13 @@ export default function CameraPage() {
     [poleLookup.data],
   );
 
+  // auto-select เสาแรกที่มีกล้อง เมื่อ lookup โหลดเสร็จ
+  useEffect(() => {
+    if (poleId === null && cameraPoles.length > 0) {
+      setPoleId(cameraPoles[0]!.id);
+    }
+  }, [cameraPoles, poleId]);
+
   const selectedPole = useMemo(
     () => cameraPoles.find((p) => p.id === poleId) ?? null,
     [cameraPoles, poleId],
@@ -93,8 +100,10 @@ export default function CameraPage() {
         </div>
       </div>
 
-      {!selectedPole ? (
-        <EmptyState text="กรุณาเลือกเสา" />
+      {cameraPoles.length === 0 && !poleLookup.isLoading ? (
+        <EmptyState text="ไม่มีเสาที่ติดตั้งกล้อง" />
+      ) : !selectedPole ? (
+        <EmptyState text="กำลังโหลด..." />
       ) : (
         <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4">
           {/* ── File list panel ── */}
