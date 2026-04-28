@@ -18,40 +18,69 @@ main         ← production (protected, deploy ผ่าน workflow_dispatch �
 
 ไปที่ **Settings → Secrets and variables → Actions**
 
-### Secrets ทั่วไป (Repository secrets)
+### Repository — ใช้ทุก environment
+
+#### 🟢 Variables (Settings → Secrets and variables → Actions → **Variables**)
+
+(ตอนนี้ยังไม่มีค่าระดับ repo ที่เป็น public — frontend URL อยู่ใน environment vars)
+
+#### 🔴 Secrets (Settings → Secrets and variables → Actions → **Secrets**)
 
 | Name | ตัวอย่างค่า | ใช้ที่ |
 |---|---|---|
 | `DOCKERHUB_USERNAME` | `teerawatk` | build-and-push |
 | `DOCKERHUB_TOKEN` | Docker Hub access token | build-and-push |
 
-### Secrets ของ UAT (Environment: `uat-dev`)
+### UAT Environment
 
-ไปที่ **Settings → Environments → New environment** ชื่อ `uat-dev`
+> สร้าง environment ชื่อ `uat-dev` ที่ **Settings → Environments → New environment**
+> แยกเก็บ 2 แบบ: **Variables** (public) กับ **Secrets** (private)
 
-| Name | ตัวอย่างค่า |
+#### 🟢 Variables (ใส่ที่ tab **Variables**) — เก็บแบบ plain text, log ได้
+
+ค่าเหล่านี้ถูก inline ลง JS bundle ของ frontend ตอน build → ผู้ใช้เห็นใน browser อยู่แล้ว ไม่ต้องเก็บเป็น secret:
+
+| Name | ตัวอย่าง |
 |---|---|
-| `UAT_HOST` | `uat.smart-pole.example.com` |
-| `UAT_USER` | `deploy` |
-| `UAT_SSH_KEY` | private key (PEM, full content) |
-| `UAT_DEPLOY_PATH` | `/home/deploy/smart-pole` |
 | `UAT_NEXT_PUBLIC_API_URL` | `https://api-uat.smart-pole.example.com` |
 | `UAT_NEXT_PUBLIC_WS_URL` | `wss://api-uat.smart-pole.example.com/ws` |
 | `UAT_NEXT_PUBLIC_HLS_BASE` | `https://stream-uat.smart-pole.example.com` |
 
-### Secrets ของ Production (Environment: `production`)
+ใช้ใน workflow: `${{ vars.UAT_NEXT_PUBLIC_API_URL }}`
 
-สร้าง environment `production` + ตั้ง **Required reviewers** (อย่างน้อย 1 คน)
+#### 🔴 Secrets (ใส่ที่ tab **Secrets**) — masked ใน log
 
-| Name | ตัวอย่างค่า |
+| Name | ตัวอย่าง | ทำไมเป็น secret |
+|---|---|---|
+| `UAT_HOST` | `uat.smart-pole.example.com` | ลด attack surface |
+| `UAT_USER` | `deploy` | login user |
+| `UAT_SSH_KEY` | private key (PEM, full content) | เข้า server ได้เต็ม |
+| `UAT_DEPLOY_PATH` | `/home/deploy/smart-pole` | path docker compose |
+
+ใช้ใน workflow: `${{ secrets.UAT_HOST }}`
+
+---
+
+### Production Environment
+
+> สร้าง environment `production` + ตั้ง **Required reviewers** (อย่างน้อย 1 คน) ก่อน deploy ทุกครั้ง
+
+#### 🟢 Variables
+
+| Name | ตัวอย่าง |
 |---|---|
-| `PROD_HOST` | `smart-pole.example.com` |
-| `PROD_USER` | `deploy` |
-| `PROD_SSH_KEY` | private key (PEM) — แยกจาก UAT |
-| `PROD_DEPLOY_PATH` | `/opt/smart-pole` |
 | `PROD_NEXT_PUBLIC_API_URL` | `https://api.smart-pole.example.com` |
 | `PROD_NEXT_PUBLIC_WS_URL` | `wss://api.smart-pole.example.com/ws` |
 | `PROD_NEXT_PUBLIC_HLS_BASE` | `https://stream.smart-pole.example.com` |
+
+#### 🔴 Secrets
+
+| Name | ตัวอย่าง |
+|---|---|
+| `PROD_HOST` | `smart-pole.example.com` |
+| `PROD_USER` | `deploy` |
+| `PROD_SSH_KEY` | private key — **แยกจาก UAT** |
+| `PROD_DEPLOY_PATH` | `/opt/smart-pole` |
 
 ---
 

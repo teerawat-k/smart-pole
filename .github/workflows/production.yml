@@ -74,9 +74,9 @@ jobs:
             ${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}
             ${{ env.FRONTEND_IMAGE }}:prod-latest
           build-args: |
-            NEXT_PUBLIC_API_URL=${{ secrets.PROD_NEXT_PUBLIC_API_URL }}
-            NEXT_PUBLIC_WS_URL=${{ secrets.PROD_NEXT_PUBLIC_WS_URL }}
-            NEXT_PUBLIC_HLS_BASE=${{ secrets.PROD_NEXT_PUBLIC_HLS_BASE }}
+            NEXT_PUBLIC_API_URL=${{ vars.PROD_NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_WS_URL=${{ vars.PROD_NEXT_PUBLIC_WS_URL }}
+            NEXT_PUBLIC_HLS_BASE=${{ vars.PROD_NEXT_PUBLIC_HLS_BASE }}
             NEXT_PUBLIC_PROJECT_PREFIX=smart-pole
           cache-from: type=gha,scope=frontend-prod
           cache-to: type=gha,scope=frontend-prod,mode=max
