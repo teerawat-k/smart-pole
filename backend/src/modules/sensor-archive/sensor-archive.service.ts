@@ -1,60 +1,28 @@
-// ── Sensor archive facade — generic API ────────────────────
-// frontend ใช้ endpoint นี้ — ระบบ dispatch ตาม sensor key registry
-import { sensorPm25Service } from "@/modules/sensor-pm25";
-import { sensorTemperatureService } from "@/modules/sensor-temperature";
-import { sensorHumidityService } from "@/modules/sensor-humidity";
-import { sensorHeartbeatSignalService } from "@/modules/sensor-heartbeat-signal";
+import { sensorReadingService } from "@/modules/sensor-reading";
 import { prisma } from "@/plugins/prisma";
 import { NotFoundError } from "@/common/errors";
 import { ErrorCode } from "@/common/errors/codes";
 
-interface HistoryParams {
-  poleId: number;
-  from: Date;
-  to: Date;
-  limit?: number;
+interface ListParams {
+  poleId:     number;
+  page:       number;
+  limit:      number;
+  from?:      bigint;
+  to?:        bigint;
+  sortBy?:    string;
+  sortOrder?: "asc" | "desc";
 }
 
 export const sensorArchiveService = {
-  async listSensorTypes() {
-    return prisma.sensorType.findMany({
-      where: { deletedAt: null, isEnabled: true },
-      orderBy: { id: "asc" },
-      select: {
-        id: true,
-        key: true,
-        displayName: true,
-        unit: true,
-        chartType: true,
-        chartColor: true,
-      },
-    });
-  },
-
   async latestForPole(poleId: number) {
-    const pole = await prisma.pole.findFirst({ where: { id: poleId, deletedAt: null } });
+    const pole = await prisma.pole.findFirst({ where: { id: poleId, deletedAt: null }, select: { id: true } });
     if (!pole) throw new NotFoundError(ErrorCode.POLE_NOT_FOUND, "ไม่พบเสาที่ระบุ");
-
-    const [pm25, temperature, humidity] = await Promise.all([
-      sensorPm25Service.findLatest(poleId),
-      sensorTemperatureService.findLatest(poleId),
-      sensorHumidityService.findLatest(poleId),
-    ]);
-    return { pm25, temperature, humidity };
+    return sensorReadingService.findLatest(poleId);
   },
 
-  async history(sensorKey: string, params: HistoryParams) {
-    switch (sensorKey) {
-      case "pm25":
-        return sensorPm25Service.findHistory(params);
-      case "temperature":
-        return sensorTemperatureService.findHistory(params);
-      case "humidity":
-        return sensorHumidityService.findHistory(params);
-      case "heartbeat_signal":
-        return sensorHeartbeatSignalService.findHistory(params);
-      default:
-        throw new NotFoundError(ErrorCode.SENSOR_TYPE_NOT_FOUND, `ไม่พบ sensor type "${sensorKey}"`);
-    }
+  async list(params: ListParams) {
+    const pole = await prisma.pole.findFirst({ where: { id: params.poleId, deletedAt: null }, select: { id: true } });
+    if (!pole) throw new NotFoundError(ErrorCode.POLE_NOT_FOUND, "ไม่พบเสาที่ระบุ");
+    return sensorReadingService.list(params);
   },
 };

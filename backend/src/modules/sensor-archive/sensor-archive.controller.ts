@@ -2,10 +2,6 @@ import { Elysia, t } from "elysia";
 import { sensorArchiveService } from "./sensor-archive.service";
 
 export const sensorArchiveController = new Elysia()
-  .get("/api/sensor-types", async () => {
-    const data = await sensorArchiveService.listSensorTypes();
-    return { success: true, data };
-  })
   .get(
     "/api/poles/:id/sensors/latest",
     async ({ params }) => {
@@ -15,31 +11,34 @@ export const sensorArchiveController = new Elysia()
     { params: t.Object({ id: t.Numeric({ minimum: 1 }) }) },
   )
   .get(
-    "/api/poles/:id/sensors/:sensorKey/history",
+    "/api/poles/:id/sensors/history",
     async ({ params, query }) => {
-      const data = await sensorArchiveService.history(params.sensorKey, {
-        poleId: params.id,
-        from: new Date(query.from),
-        to: new Date(query.to),
-        limit: query.limit,
+      const result = await sensorArchiveService.list({
+        poleId:    params.id,
+        page:      query.page,
+        limit:     query.limit,
+        from:      query.from !== undefined ? BigInt(query.from) : undefined,
+        to:        query.to   !== undefined ? BigInt(query.to)   : undefined,
+        sortBy:    query.sortBy,
+        sortOrder: query.sortOrder,
       });
       return {
         success: true,
-        data,
-        total: data.length,
-        sensorKey: params.sensorKey,
-        poleId: params.id,
+        data:    result.data,
+        total:   result.total,
+        page:    query.page,
+        limit:   query.limit,
       };
     },
     {
-      params: t.Object({
-        id: t.Numeric({ minimum: 1 }),
-        sensorKey: t.String({ minLength: 1, maxLength: 64 }),
-      }),
+      params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
       query: t.Object({
-        from: t.String({ format: "date-time" }),
-        to: t.String({ format: "date-time" }),
-        limit: t.Optional(t.Numeric({ minimum: 1, maximum: 50000 })),
+        page:      t.Numeric({ default: 1, minimum: 1 }),
+        limit:     t.Numeric({ default: 20, minimum: 1, maximum: 100 }),
+        from:      t.Optional(t.Numeric({ minimum: 0 })),
+        to:        t.Optional(t.Numeric({ minimum: 0 })),
+        sortBy:    t.Optional(t.String({ maxLength: 64 })),
+        sortOrder: t.Optional(t.Union([t.Literal("asc"), t.Literal("desc")])),
       }),
     },
   );
