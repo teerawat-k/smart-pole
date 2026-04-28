@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { AppCombobox } from "@/components/layout/app-combobox";
+import { AppDatePicker } from "@/components/layout/app-date-picker";
 import { DataTable } from "@/components/layout/data-table";
 import type { Column, SortState } from "@/components/layout/data-table";
 import { usePoleLookup } from "@/hooks/api/use-poles";
@@ -12,9 +13,24 @@ import type { SensorReadingRow } from "@/lib/api/sensor";
 
 const SORT_WHITELIST = new Set(["seq", "ingestedAt", "pm25", "temperature", "humidity"]);
 
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** YYYY-MM-DD → epoch ms ที่ 00:00:00 ของโซน Asia/Bangkok */
+function dateStartEpoch(date: string): number {
+  return new Date(`${date}T00:00:00+07:00`).getTime();
+}
+/** YYYY-MM-DD → epoch ms ที่ 23:59:59.999 ของโซน Asia/Bangkok */
+function dateEndEpoch(date: string): number {
+  return new Date(`${date}T23:59:59.999+07:00`).getTime();
+}
+
 export default function SensorPage() {
   const poleLookup = usePoleLookup();
   const [poleId, setPoleId] = useState<number | null>(null);
+  const [fromDate, setFromDate] = useState<string>(todayISO);
+  const [toDate, setToDate] = useState<string>(todayISO);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [sort, setSort] = useState<SortState | undefined>({ column: "seq", direction: "desc" });
@@ -25,11 +41,19 @@ export default function SensorPage() {
     }
   }, [poleLookup.data, poleId]);
 
-  useEffect(() => { setPage(1); }, [poleId]);
+  // เปลี่ยน filter → reset page
+  useEffect(() => { setPage(1); }, [poleId, fromDate, toDate]);
+
+  // ถ้า fromDate > toDate → bump toDate ให้เท่า fromDate
+  useEffect(() => {
+    if (fromDate > toDate) setToDate(fromDate);
+  }, [fromDate, toDate]);
 
   const history = useSensorHistory(poleId, {
     page,
     limit,
+    from:      dateStartEpoch(fromDate),
+    to:        dateEndEpoch(toDate),
     sortBy:    sort?.column,
     sortOrder: sort?.direction,
   });
@@ -111,7 +135,7 @@ export default function SensorPage() {
         </p>
       </div>
 
-      <div className="flex items-end gap-3 shrink-0">
+      <div className="flex flex-wrap items-end gap-3 shrink-0">
         <div className="space-y-1 w-72">
           <Label className="text-xs">เสาสัญญาณ</Label>
           <AppCombobox
@@ -121,6 +145,14 @@ export default function SensorPage() {
             onChange={(v) => setPoleId(Number(v))}
             required
           />
+        </div>
+        <div className="space-y-1 w-44">
+          <Label className="text-xs">วันที่เริ่มต้น</Label>
+          <AppDatePicker className="w-full" value={fromDate} onChange={setFromDate} />
+        </div>
+        <div className="space-y-1 w-44">
+          <Label className="text-xs">วันที่สิ้นสุด</Label>
+          <AppDatePicker className="w-full" value={toDate} onChange={setToDate} />
         </div>
       </div>
 
