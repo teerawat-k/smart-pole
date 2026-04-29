@@ -205,13 +205,13 @@ export default function DashboardPage() {
               />
             </div>
           </div>
-          <div className="bg-black aspect-video rounded overflow-hidden flex items-center justify-center">
+          <div className="bg-black rounded overflow-hidden flex items-center justify-center w-full h-[55vh] min-h-[320px] max-h-[640px]">
             {clipUrl ? (
               <video
                 key={clipUrl}
                 src={clipUrl}
                 controls
-                className="w-full h-full"
+                className="w-full h-full object-contain"
               >
                 เบราว์เซอร์ไม่รองรับการเล่นวิดีโอ
               </video>
