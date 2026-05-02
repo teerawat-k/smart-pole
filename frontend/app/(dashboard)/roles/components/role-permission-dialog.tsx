@@ -84,13 +84,14 @@ export function RolePermissionDialog({ editingId, onOpenChange }: Props) {
             จัดการสิทธิ์ — {role.data?.description || role.data?.name || "..."}
           </DialogTitle>
         </DialogHeader>
-        <div className="flex-1 overflow-y-auto space-y-4 -mx-6 px-6">
+        <div className="flex-1 overflow-y-auto space-y-4 -mx-4 sm:-mx-6 px-4 sm:px-6">
           {grouped.map((cat) => (
             <div key={cat.key} className="space-y-2">
               <h3 className="text-sm font-bold text-primary-dark sticky top-0 bg-background py-1 border-b">
                 {cat.label}
               </h3>
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[480px] text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr>
                     <th className="text-left py-1 pl-2">โมดูล</th>
@@ -124,6 +125,7 @@ export function RolePermissionDialog({ editingId, onOpenChange }: Props) {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           ))}
         </div>

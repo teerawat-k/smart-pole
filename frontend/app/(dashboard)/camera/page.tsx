@@ -105,7 +105,7 @@ export default function CameraPage() {
       ) : !selectedPole ? (
         <EmptyState text="กำลังโหลด..." />
       ) : (
-        <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4">
+        <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-[320px_1fr] gap-4">
           {/* ── File list panel ── */}
           <ClipListPanel
             clips={clips.data ?? []}
@@ -116,7 +116,7 @@ export default function CameraPage() {
 
           {/* ── Video player panel ── */}
           <div className="flex flex-col gap-3 min-h-0">
-            <div className="flex-1 min-h-0 bg-black rounded-md overflow-hidden flex items-center justify-center">
+            <div className="aspect-video md:aspect-auto md:flex-1 md:min-h-0 bg-black rounded-md overflow-hidden flex items-center justify-center">
               {playUrl ? (
                 <video
                   key={playUrl}
@@ -161,7 +161,7 @@ function ClipListPanel({
   onSelect: (filename: string) => void;
 }) {
   return (
-    <div className="flex flex-col rounded-md border bg-card min-h-0">
+    <div className="flex flex-col rounded-md border bg-card min-h-0 max-h-48 md:max-h-none shrink-0 md:shrink">
       <div className="shrink-0 px-3 py-2 border-b text-xs font-medium text-muted-foreground">
         รายชื่อไฟล์ ({clips.length})
       </div>

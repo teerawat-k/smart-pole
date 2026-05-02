@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,7 +12,17 @@ import {
   Shield,
   ScrollText,
   UserCircle,
+  Menu,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { usePermission } from "@/hooks/use-permission";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
@@ -35,35 +46,73 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/profile",     label: "โปรไฟล์",          icon: UserCircle },
 ];
 
-export function AppSider() {
-  const pathname = usePathname();
+function useVisibleNav(): NavItem[] {
   const { hasPermission } = usePermission();
+  return NAV_ITEMS.filter((item) => !item.permission || hasPermission(item.permission));
+}
 
-  const visible = NAV_ITEMS.filter((item) => !item.permission || hasPermission(item.permission));
+function SiderNav({ onNavigate }: { onNavigate?: () => void }) {
+  const pathname = usePathname();
+  const visible = useVisibleNav();
 
   return (
-    <aside className="flex flex-col h-full w-52 shrink-0 bg-sidebar border-r border-sidebar-border">
-      <nav className="flex-1 overflow-y-auto py-3 px-2">
-        {visible.map((item) => {
-          const active = pathname === item.href || pathname?.startsWith(item.href + "/");
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-2 px-3 py-2 rounded-lg mb-1 text-sm transition-all duration-150",
-                active
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium shadow-sm"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span className="truncate">{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+    <nav className="flex-1 overflow-y-auto py-3 px-2">
+      {visible.map((item) => {
+        const active = pathname === item.href || pathname?.startsWith(item.href + "/");
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={onNavigate}
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-lg mb-1 text-sm transition-all duration-150",
+              active
+                ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium shadow-sm"
+                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            )}
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            <span className="truncate">{item.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+/** Desktop sidebar — fixed column ≥ lg */
+export function AppSider() {
+  return (
+    <aside className="hidden lg:flex flex-col h-full w-52 shrink-0 bg-sidebar border-r border-sidebar-border">
+      <SiderNav />
     </aside>
+  );
+}
+
+/** Mobile/tablet hamburger — opens nav drawer < lg */
+export function AppSiderMobileTrigger() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden"
+          aria-label="เปิดเมนู"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left" className="w-64 max-w-[80vw] p-0 bg-sidebar">
+        <SheetHeader>
+          <SheetTitle>เมนู</SheetTitle>
+          <SheetDescription className="sr-only">รายการเมนูหลัก</SheetDescription>
+        </SheetHeader>
+        <SiderNav onNavigate={() => setOpen(false)} />
+      </SheetContent>
+    </Sheet>
   );
 }

@@ -119,7 +119,7 @@ export function PoleDialog({ open, onOpenChange, editingId }: PoleDialogProps) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="poleName" required>ชื่อเสา</Label>
                 <Input

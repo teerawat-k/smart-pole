@@ -160,7 +160,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Sensor summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+      <div className="grid grid-cols-3 gap-2 md:gap-4">
         <SensorCard
           label="PM2.5"
           value={sensors.data?.latestPm25 ?? null}
@@ -243,13 +243,13 @@ function SensorCard({
   show?: boolean;
 }) {
   return (
-    <div className={`border rounded-md p-4 ${show === false ? "opacity-50" : ""}`}>
-      <div className="text-xs uppercase tracking-wider text-brand-muted mb-2">{label}</div>
-      <div className="text-2xl font-bold text-primary-dark">
+    <div className={`border rounded-md p-3 md:p-4 ${show === false ? "opacity-50" : ""}`}>
+      <div className="text-[10px] md:text-xs uppercase tracking-wider text-brand-muted mb-1 md:mb-2 truncate">{label}</div>
+      <div className="text-lg md:text-2xl font-bold text-primary-dark">
         {value !== null ? value.toFixed(1) : "—"}
-        <span className="text-xs font-normal text-muted-foreground ml-1">{unit}</span>
+        <span className="text-[10px] md:text-xs font-normal text-muted-foreground ml-1">{unit}</span>
       </div>
-      <div className={`h-1 rounded-full mt-3 ${color} opacity-30`} />
+      <div className={`h-1 rounded-full mt-2 md:mt-3 ${color} opacity-30`} />
     </div>
   );
 }

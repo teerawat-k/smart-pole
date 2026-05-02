@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLogout } from "@/hooks/api/use-auth";
+import { AppSiderMobileTrigger } from "@/components/layout/app-sider";
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "ผู้ดูแลระบบ",
@@ -25,7 +26,8 @@ export function AppHeader() {
   const logout = useLogout();
 
   return (
-    <header className="sticky top-0 z-50 flex h-14 items-center border-b bg-background px-4 gap-3 shrink-0">
+    <header className="sticky top-0 z-50 flex h-14 items-center border-b bg-background px-2 sm:px-4 gap-2 sm:gap-3 shrink-0">
+      <AppSiderMobileTrigger />
       <div className="flex items-center gap-2">
         <Image src="/logo.png" alt="Smart Pole" width={32} height={32} />
         <span className="font-bold text-primary-dark hidden md:block">Smart Pole</span>

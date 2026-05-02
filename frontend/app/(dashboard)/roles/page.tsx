@@ -72,10 +72,11 @@ export default function RolesPage() {
               variant="ghost"
               onClick={() => setEditingId(r.id)}
               disabled={r.isSystem}
-              title={r.isSystem ? "บทบาทระบบ — ห้ามแก้ไข" : undefined}
+              title={r.isSystem ? "บทบาทระบบ — ห้ามแก้ไข" : "จัดการสิทธิ์"}
+              aria-label="จัดการสิทธิ์"
             >
-              <Settings2 className="mr-1 h-3.5 w-3.5" />
-              จัดการสิทธิ์
+              <Settings2 className="h-3.5 w-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">จัดการสิทธิ์</span>
             </Button>
           )}
           {canDelete && (

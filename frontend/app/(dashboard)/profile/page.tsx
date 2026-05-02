@@ -76,7 +76,7 @@ export default function ProfilePage() {
 
         <TabsContent value="info" className="mt-6">
           <form onSubmit={submitProfile} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="fn">ชื่อ</Label>
                 <Input id="fn" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
