@@ -2,9 +2,9 @@ import { describe, test, expect } from "bun:test";
 import { generateMqttCredential } from "./generate-credential";
 
 describe("generateMqttCredential", () => {
-  test("ส่งคืน mqttUsername = pole-{poleName}", async () => {
+  test("ส่งคืน mqttUsername = poleName (ตรงกับ Mosquitto ACL pattern %u)", async () => {
     const cred = await generateMqttCredential("test-001");
-    expect(cred.mqttUsername).toBe("pole-test-001");
+    expect(cred.mqttUsername).toBe("test-001");
   });
 
   test("ส่งคืน plain password เป็น hex 64 chars (32 bytes)", async () => {

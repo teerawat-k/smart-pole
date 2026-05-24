@@ -53,8 +53,7 @@ beforeEach(async () => {
 describe("MQTT integration — sensor handler", () => {
   test("ส่ง sensor packet → บันทึก SensorReading + อัปเดตค่าล่าสุดใน Pole", async () => {
     const now = Date.now();
-    await handleSensorMessage({
-      pole_name: TEST_POLE_NAME,
+    await handleSensorMessage(TEST_POLE_NAME, {
       timestamp: now,
       seq: 1,
       pm25: 35.2,
@@ -76,8 +75,7 @@ describe("MQTT integration — sensor handler", () => {
   });
 
   test("ปฏิเสธ payload ที่ค่า humidity เกินช่วง", async () => {
-    await handleSensorMessage({
-      pole_name: TEST_POLE_NAME,
+    await handleSensorMessage(TEST_POLE_NAME, {
       timestamp: Date.now(),
       seq: 3,
       humidity: 150,
@@ -89,14 +87,12 @@ describe("MQTT integration — sensor handler", () => {
   test("ส่ง packet ใหม่ → ค่าล่าสุดใน Pole ถูก overwrite, history เก็บทั้ง 2 row", async () => {
     const t1 = Date.now() - 1000;
     const t2 = Date.now();
-    await handleSensorMessage({
-      pole_name: TEST_POLE_NAME,
+    await handleSensorMessage(TEST_POLE_NAME, {
       timestamp: t1,
       seq: 10,
       temperature: 25,
     });
-    await handleSensorMessage({
-      pole_name: TEST_POLE_NAME,
+    await handleSensorMessage(TEST_POLE_NAME, {
       timestamp: t2,
       seq: 11,
       temperature: 30,
@@ -110,9 +106,8 @@ describe("MQTT integration — sensor handler", () => {
     expect(pole?.latestSeq).toBe(11n);
   });
 
-  test("ปฏิเสธ payload ที่ pole_name หาในฐานข้อมูลไม่เจอ", async () => {
-    await handleSensorMessage({
-      pole_name: "non-existent-pole",
+  test("ปฏิเสธ payload ที่ poleName หาในฐานข้อมูลไม่เจอ", async () => {
+    await handleSensorMessage("non-existent-pole", {
       timestamp: Date.now(),
       seq: 99,
       pm25: 10,

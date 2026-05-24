@@ -1,4 +1,5 @@
 // ── Handler: sensor packet (flat) ──────────────────────────
+// poleName มาจาก topic — `smartpole/<poleName>/sensor`
 // validate → resolve poleId → insert SensorReading + update Pole.latest* + lastSeenAt + broadcast
 // timestamp: เก็บ raw epoch ตรงๆ (ไม่แปลง) — frontend แปลง timezone เอง
 import { sensorMessageSchema } from "../schemas";
@@ -7,14 +8,13 @@ import { logger } from "@/plugins/logger";
 import { broadcastSensorReading } from "@/plugins/websocket";
 import { Prisma } from "@prisma/client";
 
-export async function handleSensorMessage(raw: unknown): Promise<void> {
+export async function handleSensorMessage(poleName: string, raw: unknown): Promise<void> {
   const parsed = sensorMessageSchema.safeParse(raw);
   if (!parsed.success) {
-    logger.warn({ errors: parsed.error.flatten() }, "MQTT sensor: validation failed");
+    logger.warn({ poleName, errors: parsed.error.flatten() }, "MQTT sensor: validation failed");
     return;
   }
   const msg = parsed.data;
-  const poleName = msg.pole_name;
   const time = BigInt(msg.timestamp);
 
   const pole = await prisma.pole.findFirst({
@@ -49,5 +49,5 @@ export async function handleSensorMessage(raw: unknown): Promise<void> {
     }),
   ]);
 
-  broadcastSensorReading(poleName, "sensor", msg);
+  broadcastSensorReading(poleName, "sensor", { poleName, ...msg });
 }

@@ -1,9 +1,13 @@
 // ── MQTT payload schemas (Zod) ─────────────────────────────
 import { z } from "zod";
 
-/** smartpole/sensor — timestamp = Unix epoch (seconds หรือ milliseconds, auto-detect) */
+/**
+ * smartpole/<poleName>/sensor
+ *
+ * `poleName` มาจาก topic — ไม่อยู่ใน payload (single source of truth)
+ * `timestamp` = Unix epoch (วินาทีหรือมิลลิวินาที — backend แปลงเก็บตามที่ส่ง)
+ */
 export const sensorMessageSchema = z.object({
-  pole_name:   z.string().min(1).max(64),
   timestamp:   z.number().int().min(0),
   seq:         z.number().int().min(0),
   pm25:        z.number().min(0).max(1000).optional(),

@@ -1,10 +1,12 @@
 // ── MQTT client singleton ──────────────────────────────────
-// Subscribe smartpole/sensor, dispatch ไป handler
+// Subscribe smartpole/+/sensor (wildcard ครอบทุกเสา), dispatch ไป handler ตาม messageType
 import mqtt, { type MqttClient } from "mqtt";
 import { env } from "@/config/env";
 import { logger } from "@/plugins/logger";
 import { parseTopic } from "./parse-topic";
 import { handleSensorMessage } from "./handlers/handle-sensor";
+
+const SENSOR_TOPIC_PATTERN = "smartpole/+/sensor" as const;
 
 let client: MqttClient | null = null;
 
@@ -31,8 +33,8 @@ export function startMqttSubscriber(): void {
 
   client.on("connect", () => {
     logger.info("MQTT: connected");
-    client?.subscribe("smartpole/sensor", { qos: 1 });
-    logger.info("MQTT: subscribed to smartpole/sensor");
+    client?.subscribe(SENSOR_TOPIC_PATTERN, { qos: 1 });
+    logger.info({ pattern: SENSOR_TOPIC_PATTERN }, "MQTT: subscribed");
   });
 
   client.on("reconnect", () => logger.warn("MQTT: reconnecting..."));
@@ -55,7 +57,16 @@ export function startMqttSubscriber(): void {
     }
 
     try {
-      await handleSensorMessage(json);
+      switch (parsedTopic.messageType) {
+        case "sensor":
+          await handleSensorMessage(parsedTopic.poleName, json);
+          break;
+        default: {
+          // exhaustive — type-checker จะ error เมื่อเพิ่ม MessageType แล้วไม่ handle
+          const _exhaustive: never = parsedTopic.messageType;
+          logger.warn({ topic, messageType: _exhaustive }, "MQTT: no handler for messageType");
+        }
+      }
     } catch (err) {
       logger.error({ err, topic }, "MQTT: handler crashed");
     }
