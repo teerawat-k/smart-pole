@@ -1,0 +1,189 @@
+# Production Readiness TODO
+
+> รายการที่ต้องเคลียร์ก่อน deploy ขึ้น production (หรือ public-facing UAT) — เพิ่ม item ใหม่ด้านบนของ section, ห้ามลบ item ที่ปิดแล้ว (mark `✅ done` + วันที่)
+
+**Priority:**
+- 🔴 **P0** — Blocker, ห้าม deploy ก่อนแก้
+- 🟠 **P1** — สำคัญ, deploy ได้แต่ต้องตาม fix ภายใน 1-2 sprint
+- 🟡 **P2** — Nice to have, ทำเมื่อมีเวลา
+
+---
+
+## 🔴 P0 — Blockers
+
+### P0-0 · Coordinate Pi firmware update ก่อน deploy MQTT topic v2
+
+- **บริบท:** ดู [decision-log.md](./decision-log.md) entry `2026-05-24 · MQTT topic v2`
+- **ปัญหา:** Backend ถูกแก้แล้วให้รับ topic `smartpole/<poleName>/sensor` (เอา `pole_name` ออกจาก payload) → Pi ที่ยัง publish topic เก่า `smartpole/sensor` จะถูก backend log warn ทิ้ง ไม่บันทึก
+- **วิธีแก้:**
+  1. แจ้งทีม firmware Pi — เปลี่ยน topic publish เป็น `smartpole/<poleName>/sensor` + เอา `pole_name` ออกจาก payload (ดู [docs/mqtt-spec.md § 7](./mqtt-spec.md))
+  2. Deploy Pi ทุกตัวก่อน
+  3. Test UAT 1-2 วัน — ตรวจ backend log ว่า packet เข้าครบ (ไม่มี "unknown topic format")
+  4. Deploy backend
+- **Estimate:** ~1-2 ชม. ต่อ firmware update + 1-2 วัน UAT verification
+- **Status:** open — backend code พร้อมแล้ว, รอ Pi firmware
+
+### P0-1 · Pole controller ไม่มี auth จริง
+
+- **ที่อยู่:** [backend/src/modules/pole/pole.controller.ts:11-14](../backend/src/modules/pole/pole.controller.ts)
+- **ปัญหา:** `getUserId(headers)` อ่าน `x-user-id` header แบบ trust + fallback = `1` (admin) → ใครยิง HTTP request ตรงก็ทำ CRUD เสาได้ทุกอย่าง รวม `regenerate-credential`
+- **comment ใน code:** `// TODO: wrap ด้วย authGuard + requirePermission`
+- **วิธีแก้:**
+  1. import `authGuard` จาก [backend/src/plugins/auth.ts](../backend/src/plugins/auth.ts) (มีอยู่แล้ว — ใช้ `derive({ as: "scoped" })` ตาม Elysia convention)
+  2. wrap controller ด้วย `.use(authGuard)` → ใช้ `({ user })` แทน `headers` — เลิก `getUserId` ทิ้ง
+  3. เพิ่ม `requirePermission("pole:create" | "pole:edit" | ...)` ต่อ endpoint ตาม permission seed
+  4. update test ที่ stub `x-user-id` → mock JWT แทน
+- **Endpoint ที่กระทบ:** 8 endpoints (`GET /` `GET /lookup` `GET /:id` `POST /` `PATCH /:id` `POST /:id/maintenance` `POST /:id/regenerate-credential` `DELETE /:id`)
+- **Estimate:** ~2 ชม. (รวม test)
+- **Status:** open
+
+### P0-2 · User controller ไม่มี auth จริง
+
+- **ที่อยู่:** [backend/src/modules/user/user.controller.ts:14-17](../backend/src/modules/user/user.controller.ts)
+- **ปัญหา:** เหมือน P0-1 — `getUserId(headers)` trust `x-user-id` header + fallback admin → ใครก็สร้าง/ลบ/unlock user ได้
+- **วิธีแก้:**
+  1. wrap `userController` + `meController` ด้วย `authGuard`
+  2. `userController` endpoints (admin-only) → `requirePermission("user:view|create|edit|delete")`
+  3. `meController` endpoints (self) → auth-only (ไม่ต้องมี permission)
+  4. update test เหมือน P0-1
+- **Endpoint ที่กระทบ:** `userController` 8 endpoints + `meController` 3 endpoints (`GET /api/me`, `PATCH /api/me`, `PATCH /api/me/password`)
+- **Estimate:** ~2.5 ชม. (รวม test + แยก permission check `me` vs `user`)
+- **Status:** open
+
+### P0-3 · Rotate Postgres dev password ที่เคย commit
+
+- **บริบท:** ดู [decision-log.md](./decision-log.md) entry `2026-05-24`
+- **ปัญหา:** password `gg0943455931` อยู่ใน git history ของ `backend/.env.example` ตั้งแต่ initial commit
+- **วิธีแก้:**
+  1. dev ทุกคน — เปลี่ยน password Postgres dev บนเครื่องตัวเอง
+  2. update `.env` ของตัวเองให้ตรง
+  3. ตรวจว่าไม่เอา password เดิมไปใช้ใน UAT/production
+  4. (optional) ถ้า repo public ในอนาคต → `git filter-repo` ลบ history
+- **Status:** open (action ฝั่ง dev — ไม่ใช่ code change)
+
+---
+
+## 🟠 P1 — Important
+
+### P1-2 · แยก production seed + กัน dev seed รันบน production
+
+- **บริบท:** ดู [decision-log.md](./decision-log.md) entry `2026-05-24 · Default admin password 12345`
+- **ปัญหา:** [seeds/users.ts:13](../backend/prisma/seeds/users.ts) hardcode admin password = `12345` (plain) — ถ้า ops รัน `bun db:seed` บน production database (อุบัติเหตุหรือ scripted deploy) จะได้ admin login ที่ใครก็เดาได้
+- **วิธีแก้:**
+  1. **กัน dev seed บน production** — เพิ่ม guard ที่หัว [seeds/index.ts](../backend/prisma/seeds/index.ts):
+     ```ts
+     if (process.env.NODE_ENV === "production") {
+       throw new Error("dev seed ห้ามรันบน production — ใช้ seeds/production.ts แทน");
+     }
+     ```
+  2. **สร้าง production seed แยก** `backend/prisma/seeds/production.ts`:
+     - require env `INITIAL_ADMIN_USERNAME` + `INITIAL_ADMIN_PASSWORD` + `INITIAL_ADMIN_EMAIL`
+     - throw ถ้าไม่ครบ
+     - seed permissions + roles เหมือนเดิม + create admin จาก env vars
+     - idempotent (`upsert` — รันซ้ำได้)
+  3. **เพิ่ม script** ใน [backend/package.json](../backend/package.json): `"db:seed:prod": "bun prisma/seeds/production.ts"`
+  4. **Deployment runbook** ระบุ: rollout production = `bun db:deploy` → `bun db:seed:prod` (ครั้งแรกเท่านั้น)
+- **กระทบ:**
+  - dev workflow ไม่เปลี่ยน (`bun db:seed` ทำงานเหมือนเดิม)
+  - ops ต้อง export 3 env vars ก่อน seed prod
+  - documentation deployment runbook
+- **Estimate:** ~2-3 ชม. (รวม test idempotency + runbook)
+- **Status:** open
+
+### P1-1 · MQTT auth provisioning service (sync DB → Mosquitto)
+
+- **บริบท:** ตอนนี้ Mosquitto ใช้ `allow_anonymous true` (dev) → ทุกคน publish ได้โดยไม่ auth → production ใช้ไม่ได้
+- **ปัญหา:**
+  1. Backend สร้าง MQTT credential ต่อเสาเก็บใน `Pole.mqttUsername` + `mqttPasswordHash` (argon2) แล้ว — แต่ Mosquitto ไม่รู้
+  2. Mosquitto passwordfile ([infra/mosquitto/config/passwordfile](../infra/mosquitto/config/passwordfile)) ว่างเปล่า
+  3. argon2 hash ของ backend ไม่ compatible กับ format password file ของ Mosquitto (Mosquitto ใช้ pbkdf2/sha512)
+- **วิธีแก้ (เลือก 1):**
+  - **(A) File-based + reload:** ตอน create/regenerate pole → backend exec `mosquitto_passwd -b file user pass` → reload Mosquitto (`SIGHUP`) — ง่ายแต่ต้องมี mosquitto_passwd บน image + share volume
+  - **(B) Dynamic Security plugin:** Mosquitto Dynsec — backend เรียก control API ของ Dynsec ผ่าน MQTT control topic — scale ดีกว่าแต่ setup ยากกว่า
+  - **(C) HTTP auth plugin (`mosquitto-auth-plug` หรือ `mosquitto-go-auth`):** Mosquitto ยิง HTTP ไปถาม backend ตอน client connect/publish — backend ตอบ allow/deny — design clean สุดแต่ละ external plugin
+- **คำแนะนำ:** เริ่ม (A) ก่อน production แรก (cost ต่ำ) → migrate ไป (C) เมื่อโต > 50 เสา
+- **กระทบ:**
+  - `pole/flow/create.ts` + `pole/flow/regenerate-credential.ts` — เพิ่ม step sync Mosquitto
+  - Docker compose — share `passwordfile` volume + ติด `mosquitto-clients` ใน backend image
+  - `mosquitto.conf` — เปลี่ยน `allow_anonymous false` + uncomment `password_file` + `acl_file`
+- **Estimate:** ~6-8 ชม. (option A) + 1 วัน UAT test
+- **Status:** open
+
+### P1-3 · SRS callback handler — implement เมื่อ SRS deploy
+
+- **บริบท:** [infra/srs/srs.conf](../infra/srs/srs.conf) ออกแบบให้ SRS callback ไปที่ backend 3 endpoint แต่ backend ยังไม่มี handler:
+  - `POST /api/srs/on-publish` — แจ้งเมื่อกล้องเริ่ม RTMP push
+  - `POST /api/srs/on-unpublish` — แจ้งเมื่อ stream หลุด
+  - `POST /api/srs/on-dvr` — แจ้งเมื่อ DVR เซฟไฟล์ mp4 เสร็จ 1 segment (30 นาที)
+- **ปัญหา:** ถ้า SRS ขึ้นโดย backend ยังไม่มี handler → ทุก callback เด้ง 404 (SRS ไม่ retry สำคัญแค่ log fail)
+- **วิธีแก้:**
+  1. สร้าง `backend/src/modules/srs/srs.controller.ts` รับ 3 endpoint ตาม payload spec ของ SRS 5
+  2. Validate `X-Srs-*` headers (ถ้ามี) + body schema
+  3. `on-publish` → mark `Pole.poleStatus = streaming` (เพิ่ม enum) หรือ flag separate
+  4. `on-dvr` → optional: index ใน DB (ไม่จำเป็นเพราะ camera-clip browser อ่าน filesystem ตรงๆ — อาจแค่ broadcast WS ให้ frontend refetch)
+  5. `on-unpublish` → optional: revert streaming flag + audit
+- **กระทบ:**
+  - SRS ต้องอยู่ใน docker-compose (ตอนนี้ไม่อยู่)
+  - เปิด port 1935 (RTMP) บน host
+  - กล้อง Dahua ต้อง config RTMP push ไปที่ SRS
+  - Frontend ต้องมี HLS player (`hls.js` ใน `package.json` + component)
+- **Estimate:** ~1-2 วัน (handler + docker-compose + กล้อง config + frontend player)
+- **Priority rationale:** P1 (ไม่ใช่ P0) เพราะ camera clip filesystem browser ใช้งานได้แล้ว — live streaming เป็น feature ต่อขยาย
+- **Status:** open — deferred จนกว่าจะตัดสินใจเปิด live streaming
+
+---
+
+## 🟡 P2 — Nice to have
+
+### P2-1 · ฟื้นหน้า Alert UI ใน frontend (ถ้าผู้ใช้ต้องการ)
+
+- **บริบท:** commit `9e40888` ลบหน้า `/alerts` + `useAlerts` hook + `lib/api/alert.ts` ออกจาก frontend, แต่ **backend module ยังทำงานอยู่ครบ**:
+  - `alertController` (REST API ยัง expose) ใน [src/index.ts](../backend/src/index.ts):81
+  - `alertService` มี 4 ops: `list`, `createOrIgnore` (dedupe 60s), `resolve`, `autoResolveForPole`
+  - `heartbeat-scan` auto-create POLE_OFFLINE alert ทุกครั้งเสาขาดสัญญาณ → ข้อมูลสะสมใน DB ไม่หาย
+- **ปัญหา:** alert data ถูกสร้าง+เก็บ แต่ user ไม่เห็น UI → "silent data sink"
+- **ตัวเลือก:**
+  - **(A)** ปล่อยไว้ (status ปัจจุบัน) — data สะสมเผื่อใช้ภายหลัง
+  - **(B)** ฟื้นกลับ — สร้าง `frontend/lib/api/alert.ts` + `useAlerts` hook + `/alerts` page ใหม่ (~4-6 ชม.)
+  - **(C)** ถอด backend ออกด้วย — ลบ `modules/alert/` + ถอด `alertController` จาก `src/index.ts` + เอา auto-create ออกจาก `heartbeat-scan/flow/scan-offline-poles.ts` + drop `Alert` table ใน migration ใหม่ (~2-3 ชม.)
+- **ปัจจุบัน:** เลือก (A) — ทบทวนเมื่อ stakeholder ตัดสินใจ
+- **Status:** decision required
+
+### P2-3 · เพิ่ม PM10 ใน schema + MQTT payload (sensor รองรับแล้ว)
+
+- **บริบท:** Sensor field คือ **PM2510TH-OD** (sumtech.co.th) — รองรับ **PM2.5 + PM10 + Temp + Humi** แต่ระบบเก็บแค่ PM2.5
+- **ที่อยู่:**
+  - Schema: [backend/prisma/schema.prisma](../backend/prisma/schema.prisma) — `SensorReading` ไม่มี column `pm10`, `Pole` ไม่มี `latestPm10`/`hasPm10Sensor`
+  - MQTT: [backend/src/plugins/mqtt/schemas.ts](../backend/src/plugins/mqtt/schemas.ts) — `sensorMessageSchema` ไม่มี `pm10` field
+  - Frontend: [frontend/app/(dashboard)/dashboard/page.tsx](../frontend/app/(dashboard)/dashboard/page.tsx) — ไม่แสดง card PM10
+- **วิธีแก้:**
+  1. **Migration** เพิ่ม columns:
+     - `SensorReading.pm10  Decimal? @db.Decimal(8, 2)`
+     - `Pole.latestPm10     Decimal? @db.Decimal(8, 2)`
+     - `Pole.hasPm10Sensor  Boolean @default(false)`
+  2. **MQTT schema** เพิ่ม `pm10: z.number().min(0).max(2000).optional()` (PM10 range สูงกว่า PM2.5)
+  3. **MQTT handler** insert + update PM10
+  4. **Frontend Dashboard** เพิ่ม PM10 sensor card (filter `selected.hasPm10Sensor`)
+  5. **Pole form** เพิ่ม checkbox `hasPm10Sensor`
+  6. **Pi firmware** ส่ง `pm10` ใน sensor payload (coordinate กับทีม Pi)
+- **Estimate:** ~3-4 ชม. (schema + migration + UI + Pi coordination)
+- **Priority rationale:** P2 — ไม่ใช่ blocker, แต่เป็น hardware capability ที่ทิ้งไว้เปล่าๆ น่าเสียดาย
+- **Status:** open
+
+### P2-2 · ลบ `account_unlocked` audit log ที่บันทึก userId ผิด
+
+- **ที่อยู่:** [backend/src/modules/user/flow/unlock.ts:22-26](../backend/src/modules/user/flow/unlock.ts)
+- **ปัญหา:** `logSystem({ userId: requestUserId })` บันทึก userId ของ admin (คนปลดล็อก) ไม่ใช่ target user → audit trail แสดง "admin ถูก unlock" แทน "user X ถูก unlock"
+- **วิธีแก้:** เปลี่ยน `userId: requestUserId` เป็น `userId: user.id` (target user) + เพิ่ม `detail: { unlockedBy: requestUserId }` ใน JSON เพื่อเก็บ context คนปลดล็อก
+- **Estimate:** ~15 นาที
+- **Status:** open
+
+---
+
+## ✅ Done
+
+### ✅ 2026-05-24 · MQTT username inconsistency — แก้ `generate-credential` ให้ตรงกับ seed
+
+- **ปัญหาเดิม:** `seeds/poles.ts:33` ตั้ง `mqttUsername = poleName` (`pole-01`) แต่ `pole/flow/generate-credential.ts:15` ใช้ `"pole-" + poleName` (`pole-pole-01`) → ผิด pattern กัน
+- **วิธีแก้:** เลือก format `poleName` ตรงๆ (ตรงกับ ACL pattern `%u` + เรียบง่าย) — แก้ `generate-credential.ts` เอา prefix `pole-` ออก + update test
+- **Verified:** test case `"ส่งคืน mqttUsername = poleName (ตรงกับ Mosquitto ACL pattern %u)"` ใน [generate-credential.test.ts](../backend/src/modules/pole/flow/generate-credential.test.ts)
