@@ -32,27 +32,47 @@ export function HlsPlayer({
     setState("loading");
     setErrorMessage(null);
 
-    // Safari + iOS รองรับ HLS native — ใช้ตรง
+    // ── Common video listeners ────────────────────────────
+    // transition ออกจาก loading เมื่อ video เริ่มเล่นจริงๆ
+    const onCanPlay = () => {
+      if (autoPlay) {
+        void video.play().catch(() => {
+          // ถ้า autoplay ถูก block ผู้ใช้ต้องกด play เอง — แสดง controls
+          setState("playing"); // ออกจาก loading เพราะ stream พร้อมแล้ว
+        });
+      } else {
+        setState("playing");
+      }
+    };
+    const onPlaying = () => setState("playing");
+    const onError = () => {
+      setState("error");
+      setErrorMessage("วิดีโอเล่นไม่ได้");
+    };
+    video.addEventListener("canplay", onCanPlay);
+    video.addEventListener("playing", onPlaying);
+    video.addEventListener("error", onError);
+
+    // ── Safari + iOS รองรับ HLS native ────────────────────
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = src;
-      const onPlay = () => setState("playing");
-      const onError = () => {
-        setState("error");
-        setErrorMessage("เปิดสตรีมไม่สำเร็จ");
-      };
-      video.addEventListener("playing", onPlay);
-      video.addEventListener("error", onError);
       return () => {
-        video.removeEventListener("playing", onPlay);
+        video.removeEventListener("canplay", onCanPlay);
+        video.removeEventListener("playing", onPlaying);
         video.removeEventListener("error", onError);
-        video.src = "";
+        video.removeAttribute("src");
+        video.load();
       };
     }
 
     if (!Hls.isSupported()) {
       setState("error");
       setErrorMessage("เบราว์เซอร์ไม่รองรับ HLS");
-      return;
+      return () => {
+        video.removeEventListener("canplay", onCanPlay);
+        video.removeEventListener("playing", onPlaying);
+        video.removeEventListener("error", onError);
+      };
     }
 
     const hls = new Hls({
@@ -64,12 +84,18 @@ export function HlsPlayer({
     hls.loadSource(src);
     hls.attachMedia(video);
 
-    const onPlaying = () => setState("playing");
-    video.addEventListener("playing", onPlaying);
+    // call play() อย่าง explicit เพื่อกัน autoplay policy block (บางเบราว์เซอร์)
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      if (autoPlay) {
+        void video.play().catch(() => {
+          // ถูก block — user ต้องกด play ด้วยตัวเอง
+          setState("playing");
+        });
+      }
+    });
 
     hls.on(Hls.Events.ERROR, (_, data) => {
       if (!data.fatal) return;
-      // recover network errors automatically
       if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
         hls.startLoad();
         return;
@@ -83,10 +109,12 @@ export function HlsPlayer({
     });
 
     return () => {
+      video.removeEventListener("canplay", onCanPlay);
       video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("error", onError);
       hls.destroy();
     };
-  }, [src]);
+  }, [src, autoPlay]);
 
   return (
     <div className={`relative ${className ?? ""}`}>
