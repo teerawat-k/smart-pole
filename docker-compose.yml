@@ -23,6 +23,29 @@ services:
     networks:
       - smart-pole-network
 
+  # ─── SRS (Simple Realtime Server — RTMP ingest → HLS playback) ─────────────
+  # Pi pushes: rtmp://<host>:1935/live/<poleName>
+  # Browser plays: http://<host>:8080/live/<poleName>.m3u8
+  srs:
+    image: ossrs/srs:5
+    container_name: smart-pole-srs
+    restart: unless-stopped
+    ports:
+      - '1935:1935'    # RTMP ingest
+      - '8080:8080'    # HLS serve
+    volumes:
+      - ./infra/srs/srs.conf:/usr/local/srs/conf/docker.conf:ro
+    command: ./objs/srs -c conf/docker.conf
+    environment:
+      TZ: Asia/Bangkok
+    networks:
+      - smart-pole-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+
   # ─── Backend (Bun + Elysia) ────────────────────────────────────────────────
   backend:
     image: ${DOCKERHUB_USERNAME:-teerawatk}/smart-pole-backend:${IMAGE_TAG:-latest}

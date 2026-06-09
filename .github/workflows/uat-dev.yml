@@ -164,6 +164,11 @@ jobs:
             docker compose up -d mosquitto
             docker compose kill -s HUP mosquitto 2>/dev/null || true   # reload conf without restart
 
+            # ─── SRS: ensure running (RTMP ingest + HLS serve) ──────────────
+            # Pi → rtmp://host:1935/live/<poleName>, Browser → http://host:8080/live/<poleName>.m3u8
+            echo "📺 Ensuring SRS running..."
+            docker compose up -d srs
+
             # ─── Backend: pull → migrate → restart ──────────────────────────
             echo "📥 Pulling latest backend image..."
             docker compose pull backend
