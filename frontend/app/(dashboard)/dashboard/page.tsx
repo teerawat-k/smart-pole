@@ -4,12 +4,10 @@ import { useState, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { AppCombobox } from "@/components/layout/app-combobox";
-import { AppDatePicker } from "@/components/layout/app-date-picker";
-import { Wifi, WifiOff, Wrench, Antenna, Video } from "lucide-react";
+import { Wifi, WifiOff, Wrench, Antenna, Radio } from "lucide-react";
 import { usePoleLookup } from "@/hooks/api/use-poles";
 import { useSensorLatest } from "@/hooks/api/use-sensors";
-import { useClipList, useLatestClip } from "@/hooks/api/use-camera-clips";
-import { cameraClipApi } from "@/lib/api/camera-clip";
+import { HlsPlayer } from "@/components/shared/hls-player";
 import { env } from "@/config/env";
 import type { PoleStatus } from "@/lib/api/pole";
 import { useAuthStore } from "@/stores/auth-store";
@@ -78,54 +76,9 @@ export default function DashboardPage() {
     [poleLookup.data],
   );
 
-  // ── Camera clip picker (date + file) ────────────────────
-  const [clipDate, setClipDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [clipFile, setClipFile] = useState<string | null>(null);
-  // เปลี่ยนเสาแล้วต้องรอ "latest" hint มา set ก่อนถึง list — กัน list เก่ากระโดดเลือก auto
-  const [hydratedFromLatest, setHydratedFromLatest] = useState(false);
-
-  const cameraPoleName = selected?.hasCamera ? selected.poleName : null;
-  const latest = useLatestClip(cameraPoleName);
-  const clips = useClipList(cameraPoleName, clipDate);
-
-  // เปลี่ยนเสา → reset ทุกอย่าง รอ latest มา
-  useEffect(() => {
-    setClipFile(null);
-    setHydratedFromLatest(false);
-  }, [selectedId]);
-
-  // latest โหลดมา → set date+file ของไฟล์ล่าสุด (รอบเดียวต่อการเปลี่ยนเสา)
-  useEffect(() => {
-    if (!hydratedFromLatest && latest.data) {
-      setClipDate(latest.data.date);
-      setClipFile(latest.data.filename);
-      setHydratedFromLatest(true);
-    } else if (!hydratedFromLatest && latest.isFetched && !latest.data) {
-      // ไม่มีไฟล์เลย — mark hydrated แต่คงค่า date เป็นวันนี้, file = null
-      setHydratedFromLatest(true);
-    }
-  }, [latest.data, latest.isFetched, hydratedFromLatest]);
-
-  // ผู้ใช้เปลี่ยนวันด้วยตนเอง (หลัง hydrated) → reset file + auto-select ไฟล์ใหม่สุดของวันนั้น
-  useEffect(() => {
-    if (!hydratedFromLatest) return;
-    setClipFile(null);
-  }, [clipDate, hydratedFromLatest]);
-
-  useEffect(() => {
-    if (!hydratedFromLatest) return;
-    if (clips.data && clips.data.length > 0 && clipFile === null) {
-      setClipFile(clips.data[0]!.filename);
-    }
-  }, [clips.data, clipFile, hydratedFromLatest]);
-
-  const fileOptions = useMemo(
-    () => (clips.data ?? []).map((c) => ({ id: c.filename, label: c.filename })),
-    [clips.data],
-  );
-
-  const clipUrl = selected && clipFile
-    ? cameraClipApi.buildStreamUrl(selected.poleName, clipDate, clipFile)
+  // ── Live stream URL — เปลี่ยน key เพื่อ remount HlsPlayer เมื่อเปลี่ยนเสา ────
+  const liveStreamUrl = selected?.hasCamera
+    ? `${env.NEXT_PUBLIC_HLS_BASE}/live/${selected.poleName}.m3u8`
     : null;
 
   return (
@@ -184,44 +137,26 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Camera clip player */}
-      {selected?.hasCamera && (
+      {/* Camera live stream */}
+      {selected?.hasCamera && liveStreamUrl && (
         <div className="border rounded-md p-4 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="text-sm font-medium">บันทึกกล้อง — {selected.poleName}</div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <AppDatePicker
-                className="w-44"
-                value={clipDate}
-                onChange={setClipDate}
-              />
-              <AppCombobox
-                className="w-56"
-                options={fileOptions}
-                value={clipFile}
-                onChange={(v) => setClipFile(String(v))}
-                required
-                disabled={clips.isLoading || fileOptions.length === 0}
-              />
-            </div>
+            <div className="text-sm font-medium">กล้องสด — {selected.poleName}</div>
+            <Badge className="bg-red-500 text-white animate-pulse">
+              <Radio className="mr-1 h-3 w-3" />
+              LIVE
+            </Badge>
           </div>
-          <div className="bg-black rounded overflow-hidden flex items-center justify-center w-full h-[55vh] min-h-[320px] max-h-[640px]">
-            {clipUrl ? (
-              <video
-                key={clipUrl}
-                src={clipUrl}
-                controls
-                className="w-full h-full object-contain"
-              >
-                เบราว์เซอร์ไม่รองรับการเล่นวิดีโอ
-              </video>
-            ) : (
-              <div className="flex flex-col items-center text-gray-400">
-                <Video className="h-10 w-10 mb-2" />
-                {clips.data && clips.data.length === 0 ? "ไม่มีคลิปในวันที่เลือก" : "เลือกไฟล์ที่ต้องการดู"}
-              </div>
-            )}
+          <div className="bg-black rounded overflow-hidden w-full h-[55vh] min-h-[320px] max-h-[640px]">
+            <HlsPlayer
+              key={liveStreamUrl}
+              src={liveStreamUrl}
+              className="w-full h-full"
+            />
           </div>
+          <p className="text-xs text-muted-foreground">
+            HLS Live — ดูคลิปย้อนหลังที่หน้า <a href="/camera" className="underline">บันทึกกล้อง</a>
+          </p>
         </div>
       )}
 
