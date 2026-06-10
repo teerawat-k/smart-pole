@@ -143,20 +143,18 @@ export function HlsPlayer({
         playsInline
         className="w-full h-full object-contain bg-black"
       />
-      {state !== "playing" && (
+      {/* แสดง overlay เฉพาะตอน error — loading ปล่อยให้ <video> แสดงเอง */}
+      {state === "error" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-300 bg-black/70 pointer-events-none">
-          {state === "loading" && (
-            <>
-              <Loader2 className="h-8 w-8 animate-spin mb-2" />
-              <span className="text-sm">กำลังเชื่อมต่อสตรีม...</span>
-            </>
-          )}
-          {state === "error" && (
-            <>
-              <VideoOff className="h-10 w-10 mb-2" />
-              <span className="text-sm">{errorMessage ?? "สตรีมหยุดทำงาน"}</span>
-            </>
-          )}
+          <VideoOff className="h-10 w-10 mb-2" />
+          <span className="text-sm">{errorMessage ?? "สตรีมหยุดทำงาน"}</span>
+        </div>
+      )}
+      {/* loading indicator มุมขวาบน — ไม่บัง video */}
+      {state === "loading" && (
+        <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 text-white text-xs px-2 py-1 rounded pointer-events-none">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span>เชื่อมต่อ...</span>
         </div>
       )}
     </div>

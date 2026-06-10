@@ -1,0 +1,16 @@
+[Unit]
+Description=Smart Pole Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/home/pi/smartpole-env/bin/python3 /home/pi/smartpole/main.py
+WorkingDirectory=/home/pi/smartpole
+Restart=always
+RestartSec=10
+User=pi
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
