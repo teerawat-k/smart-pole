@@ -7,9 +7,42 @@
 | File | หน้าที่ | Pi path |
 |---|---|---|
 | `main.py` | MQTT publisher — ส่ง sensor data ทุก 5 นาที | `/home/pi/smartpole/main.py` |
-| `stream-rtmp.sh` | ffmpeg push RTSP กล้อง → RTMP SRS (24/7) | `/home/pi/smartpole/stream-rtmp.sh` |
+| `stream-rtmp.sh` | **ffmpeg tee**: RTMP live + mp4 segment 30 นาที (DVR) | `/home/pi/smartpole/stream-rtmp.sh` |
+| `sync-recordings.sh` | rsync mp4 ที่บันทึก → DO ทุก 5 นาที (cron) | `/home/pi/smartpole/sync-recordings.sh` |
+| `cleanup-recordings.sh` | ลบ clip > 3 วันบน Pi (cron daily 3am) | `/home/pi/smartpole/cleanup-recordings.sh` |
 | `smartpole.service` | systemd unit สำหรับ `main.py` | `/etc/systemd/system/smartpole.service` |
 | `smartpole-stream.service` | systemd unit สำหรับ `stream-rtmp.sh` | `/etc/systemd/system/smartpole-stream.service` |
+
+## DVR Architecture
+
+```
+Camera RTSP → Pi ffmpeg (tee single transcode HEVC→H.264) ─┬→ RTMP push → SRS → HLS live
+                                                          └→ mp4 30-min segment → local disk
+                                                                ↓ rsync ทุก 5 นาที
+                                            DO: /var/www/smart-pole/data/uploads/camera/<poleName>/<date>/<file>.mp4
+                                                                ↓
+                                            Backend camera-clip service (filesystem browser)
+                                                                ↓
+                                            Dashboard /camera page
+
+Retention:
+  Pi 3 วัน (cron daily 3am)
+  DO 30 วัน (cron daily 4am)
+```
+
+## Crontab ที่ติดตั้งบน Pi
+
+```cron
+*/5 * * * * /home/pi/smartpole/sync-recordings.sh >> /home/pi/smartpole/sync.log 2>&1
+0 3 * * * /home/pi/smartpole/cleanup-recordings.sh >> /home/pi/smartpole/cleanup.log 2>&1
+```
+
+## Crontab ที่ติดตั้งบน DO host
+
+```cron
+0 4 * * * /usr/local/bin/smartpole-cleanup-clips.sh >> /var/log/smartpole-cleanup.log 2>&1
+```
+(script จาก `infra/host-scripts/cleanup-camera-clips.sh`)
 
 ## Deploy บน Pi ใหม่
 
