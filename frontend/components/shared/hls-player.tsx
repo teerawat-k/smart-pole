@@ -32,23 +32,24 @@ export function HlsPlayer({
     setState("loading");
     setErrorMessage(null);
 
-    // ── Common video listeners ────────────────────────────
-    // transition ออกจาก loading เมื่อ video เริ่มเล่นจริงๆ
+    // ใช้ updater function เพื่อกัน stale closure
+    const goPlaying = () => setState((s) => (s === "loading" ? "playing" : s));
+
+    // ── Video listeners — ทุก event ที่บอกว่าพร้อมเล่น ──────
+    const onLoadedData = () => goPlaying();
     const onCanPlay = () => {
       if (autoPlay) {
-        void video.play().catch(() => {
-          // ถ้า autoplay ถูก block ผู้ใช้ต้องกด play เอง — แสดง controls
-          setState("playing"); // ออกจาก loading เพราะ stream พร้อมแล้ว
-        });
+        void video.play().catch(() => goPlaying());
       } else {
-        setState("playing");
+        goPlaying();
       }
     };
-    const onPlaying = () => setState("playing");
+    const onPlaying = () => goPlaying();
     const onError = () => {
       setState("error");
       setErrorMessage("วิดีโอเล่นไม่ได้");
     };
+    video.addEventListener("loadeddata", onLoadedData);
     video.addEventListener("canplay", onCanPlay);
     video.addEventListener("playing", onPlaying);
     video.addEventListener("error", onError);
@@ -57,6 +58,7 @@ export function HlsPlayer({
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = src;
       return () => {
+        video.removeEventListener("loadeddata", onLoadedData);
         video.removeEventListener("canplay", onCanPlay);
         video.removeEventListener("playing", onPlaying);
         video.removeEventListener("error", onError);
@@ -69,6 +71,7 @@ export function HlsPlayer({
       setState("error");
       setErrorMessage("เบราว์เซอร์ไม่รองรับ HLS");
       return () => {
+        video.removeEventListener("loadeddata", onLoadedData);
         video.removeEventListener("canplay", onCanPlay);
         video.removeEventListener("playing", onPlaying);
         video.removeEventListener("error", onError);
@@ -77,9 +80,7 @@ export function HlsPlayer({
 
     const hls = new Hls({
       enableWorker: true,
-      // ปิด lowLatencyMode — SRS ไม่ support LL-HLS (HTTP/2 + CMAF chunks)
       lowLatencyMode: false,
-      // live sync: ใช้ segment ที่ 4s หลัง edge — สอดคล้องกับ hls_fragment 4s ของ SRS
       liveSyncDuration: 4,
       liveMaxLatencyDuration: 12,
       backBufferLength: 30,
@@ -92,20 +93,17 @@ export function HlsPlayer({
     hls.loadSource(src);
     hls.attachMedia(video);
 
-    // call play() เมื่อ manifest parsed
+    // ── HLS events — multiple trigger เผื่อ video event ไม่ fire ──
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      if (autoPlay) {
-        void video.play().catch(() => {
-          // autoplay block — ออกจาก loading state ให้ user กด play เอง
-          setState("playing");
-        });
-      }
+      if (autoPlay) void video.play().catch(() => goPlaying());
     });
 
-    // backup transition — เมื่อ frag แรกถูก buffer ก็แสดงว่าพร้อมเล่นแล้ว
-    hls.on(Hls.Events.FRAG_BUFFERED, () => {
-      if (state === "loading") setState("playing");
+    hls.on(Hls.Events.LEVEL_LOADED, () => {
+      // variant playlist parsed → SRS HLS ready
+      if (autoPlay) void video.play().catch(() => undefined);
     });
+
+    hls.on(Hls.Events.FRAG_BUFFERED, () => goPlaying());
 
     hls.on(Hls.Events.ERROR, (_, data) => {
       if (!data.fatal) return;
@@ -121,7 +119,13 @@ export function HlsPlayer({
       setErrorMessage(`เกิดข้อผิดพลาดในการสตรีม (${data.type})`);
     });
 
+    // ── Safety net — force ออกจาก loading หลัง 8 วินาที ────
+    // ถ้า event ทั้งหมดข้างบนไม่ trigger ภายใน 8s ให้ user เห็น video element + กด play
+    const safetyTimer = setTimeout(() => goPlaying(), 8_000);
+
     return () => {
+      clearTimeout(safetyTimer);
+      video.removeEventListener("loadeddata", onLoadedData);
       video.removeEventListener("canplay", onCanPlay);
       video.removeEventListener("playing", onPlaying);
       video.removeEventListener("error", onError);
