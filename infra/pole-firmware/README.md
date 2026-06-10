@@ -27,7 +27,7 @@ Camera RTSP → Pi ffmpeg (tee single transcode HEVC→H.264) ─┬→ RTMP pus
 
 Retention:
   Pi 3 วัน (cron daily 3am)
-  DO 30 วัน (cron daily 4am)
+  DO 7 วัน (cron daily 4am)
 ```
 
 ## Crontab ที่ติดตั้งบน Pi

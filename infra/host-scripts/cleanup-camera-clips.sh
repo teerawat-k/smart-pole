@@ -1,8 +1,8 @@
 #!/bin/bash
 # Smart Pole — ลบ camera clip เก่าบน DO host เกิน N วัน (cron daily 4am)
-# Default: 30 วัน
+# Default: 7 วัน
 
-RETENTION_DAYS=${SMARTPOLE_DO_RETENTION_DAYS:-30}
+RETENTION_DAYS=${SMARTPOLE_DO_RETENTION_DAYS:-7}
 RECORD_BASE="/var/www/smart-pole/data/uploads/camera"
 
 if [ ! -d "$RECORD_BASE" ]; then
