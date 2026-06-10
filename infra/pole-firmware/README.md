@@ -7,28 +7,37 @@
 | File | หน้าที่ | Pi path |
 |---|---|---|
 | `main.py` | MQTT publisher — ส่ง sensor data ทุก 5 นาที | `/home/pi/smartpole/main.py` |
-| `stream-rtmp.sh` | **ffmpeg tee**: RTMP live + mp4 segment 30 นาที (DVR) | `/home/pi/smartpole/stream-rtmp.sh` |
+| `stream-rtmp.sh` | ffmpeg RTMP push → SRS (live playback) | `/home/pi/smartpole/stream-rtmp.sh` |
+| `record-mp4.sh` | ffmpeg segment mp4 30 นาที (DVR) | `/home/pi/smartpole/record-mp4.sh` |
 | `sync-recordings.sh` | rsync mp4 ที่บันทึก → DO ทุก 5 นาที (cron) | `/home/pi/smartpole/sync-recordings.sh` |
 | `cleanup-recordings.sh` | ลบ clip > 3 วันบน Pi (cron daily 3am) | `/home/pi/smartpole/cleanup-recordings.sh` |
 | `smartpole.service` | systemd unit สำหรับ `main.py` | `/etc/systemd/system/smartpole.service` |
-| `smartpole-stream.service` | systemd unit สำหรับ `stream-rtmp.sh` | `/etc/systemd/system/smartpole-stream.service` |
+| `smartpole-stream.service` | systemd unit สำหรับ `stream-rtmp.sh` (live) | `/etc/systemd/system/smartpole-stream.service` |
+| `smartpole-record.service` | systemd unit สำหรับ `record-mp4.sh` (DVR) | `/etc/systemd/system/smartpole-record.service` |
 
 ## DVR Architecture
 
 ```
-Camera RTSP → Pi ffmpeg (tee single transcode HEVC→H.264) ─┬→ RTMP push → SRS → HLS live
-                                                          └→ mp4 30-min segment → local disk
-                                                                ↓ rsync ทุก 5 นาที
-                                            DO: /var/www/smart-pole/data/uploads/camera/<poleName>/<date>/<file>.mp4
-                                                                ↓
-                                            Backend camera-clip service (filesystem browser)
-                                                                ↓
-                                            Dashboard /camera page
+Camera RTSP ─┬→ ffmpeg #1 (smartpole-stream): RTSP → H.264 + silent AAC → RTMP push → SRS → HLS live
+             │
+             └→ ffmpeg #2 (smartpole-record): RTSP → H.264 + silent AAC → mp4 segment 30 นาที (local)
+                  ↓ rsync ทุก 5 นาที (sync-recordings.sh cron)
+DO: /var/www/smart-pole/data/uploads/camera/<poleName>/<date>/<file>.mp4
+                  ↓
+Backend camera-clip service (filesystem browser)
+                  ↓
+Dashboard /camera page
 
 Retention:
   Pi 3 วัน (cron daily 3am)
   DO 7 วัน (cron daily 4am)
 ```
+
+### ทำไมแยก 2 ffmpeg ไม่ใช้ tee muxer?
+
+ffmpeg `-f tee` กับ FLV/RTMP slave มีปัญหา timing ตอน startup — RTMP fail ครั้งแรก, `onfail=ignore` ทำให้ live ตาย (recording ยังทำงาน)
+แยก 2 process: simple + reliable + failure isolated
+Cost: 2× transcode CPU = ~110% ของ 1 core (Pi 4 มี 4 cores พอเหลือ) + 2× RTSP pull จากกล้อง (Dahua รองรับหลาย client)
 
 ## Crontab ที่ติดตั้งบน Pi
 

@@ -1,0 +1,18 @@
+[Unit]
+Description=Smart Pole DVR Record (RTSP -> mp4 segment 30 min)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/pi/smartpole/record-mp4.sh
+WorkingDirectory=/home/pi/smartpole
+User=pi
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=AV_LOG_FORCE_NOCOLOR=1
+
+[Install]
+WantedBy=multi-user.target
