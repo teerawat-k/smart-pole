@@ -38,6 +38,7 @@ jobs:
           filters: |
             backend:
               - "backend/**"
+              - "infra/**"
               - "docker-compose.yml"
               - ".github/workflows/uat-dev.yml"
             frontend:
