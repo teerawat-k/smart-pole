@@ -77,21 +77,34 @@ export function HlsPlayer({
 
     const hls = new Hls({
       enableWorker: true,
-      lowLatencyMode: true,
+      // ปิด lowLatencyMode — SRS ไม่ support LL-HLS (HTTP/2 + CMAF chunks)
+      lowLatencyMode: false,
+      // live sync: ใช้ segment ที่ 4s หลัง edge — สอดคล้องกับ hls_fragment 4s ของ SRS
+      liveSyncDuration: 4,
+      liveMaxLatencyDuration: 12,
       backBufferLength: 30,
-      maxBufferLength: 10,
+      maxBufferLength: 30,
+      manifestLoadingTimeOut: 10_000,
+      manifestLoadingMaxRetry: 3,
+      levelLoadingTimeOut: 10_000,
+      fragLoadingTimeOut: 20_000,
     });
     hls.loadSource(src);
     hls.attachMedia(video);
 
-    // call play() อย่าง explicit เพื่อกัน autoplay policy block (บางเบราว์เซอร์)
+    // call play() เมื่อ manifest parsed
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
       if (autoPlay) {
         void video.play().catch(() => {
-          // ถูก block — user ต้องกด play ด้วยตัวเอง
+          // autoplay block — ออกจาก loading state ให้ user กด play เอง
           setState("playing");
         });
       }
+    });
+
+    // backup transition — เมื่อ frag แรกถูก buffer ก็แสดงว่าพร้อมเล่นแล้ว
+    hls.on(Hls.Events.FRAG_BUFFERED, () => {
+      if (state === "loading") setState("playing");
     });
 
     hls.on(Hls.Events.ERROR, (_, data) => {
