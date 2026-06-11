@@ -33,23 +33,30 @@ export function getConnectionCount(): number {
   return total;
 }
 
+// JSON replacer ให้ BigInt → Number (ตรงกับ Decimal serializer ใน plugins/prisma.ts)
+// payload ที่มี timestamp เป็น bigint (เช่น lastSeenAt ของ pole) จะ throw "cannot serialize BigInt"
+// ถ้าไม่มี replacer
+function jsonReplacer(_key: string, value: unknown): unknown {
+  return typeof value === "bigint" ? Number(value) : value;
+}
+
 // ── Broadcast atoms ───────────────────────────────────────
 export function sendInvalidate(userIds: number[], entity: string, payload?: unknown): void {
-  const msg = JSON.stringify({ type: "invalidate", entity, payload });
+  const msg = JSON.stringify({ type: "invalidate", entity, payload }, jsonReplacer);
   for (const uid of userIds) {
     connections.get(uid)?.forEach((ws) => safeSend(ws, msg));
   }
 }
 
 export function sendNotification(userIds: number[], notification: { title: string; message: string; severity?: string; refType?: string; refId?: number }): void {
-  const msg = JSON.stringify({ type: "notification", payload: notification });
+  const msg = JSON.stringify({ type: "notification", payload: notification }, jsonReplacer);
   for (const uid of userIds) {
     connections.get(uid)?.forEach((ws) => safeSend(ws, msg));
   }
 }
 
 export function broadcastToAll(message: unknown): void {
-  const msg = JSON.stringify(message);
+  const msg = JSON.stringify(message, jsonReplacer);
   for (const set of connections.values()) {
     set.forEach((ws) => safeSend(ws, msg));
   }
