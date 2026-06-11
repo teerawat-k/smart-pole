@@ -1,11 +1,13 @@
 import { z } from "zod";
 
+// URL env vars ทั้งหมดเป็น optional (default "") — frontend ใช้ relative URL
+// ผ่าน lib/runtime-url.ts ทำให้ใช้งานได้ทั้ง HTTP (port 7765) และ HTTPS (nginx)
 const envSchema = z.object({
-  NEXT_PUBLIC_API_URL: z.string().url(),
-  NEXT_PUBLIC_WS_URL: z.string().min(1).default("ws://localhost:7766/ws"),
+  NEXT_PUBLIC_API_URL: z.string().default(""),
+  NEXT_PUBLIC_WS_URL: z.string().default(""),
   NEXT_PUBLIC_PROJECT_PREFIX: z.string().min(1),
-  // SRS HLS base URL (live stream playback) — e.g. http://152.42.242.162:7780
-  NEXT_PUBLIC_HLS_BASE: z.string().url().default("http://localhost:7780"),
+  // SRS HLS base URL — empty = ใช้ /hls relative path
+  NEXT_PUBLIC_HLS_BASE: z.string().default(""),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 

@@ -8,7 +8,7 @@ import { Wifi, WifiOff, Wrench, Antenna, Radio } from "lucide-react";
 import { usePoleLookup } from "@/hooks/api/use-poles";
 import { useSensorLatest } from "@/hooks/api/use-sensors";
 import { HlsPlayer } from "@/components/shared/hls-player";
-import { env } from "@/config/env";
+import { buildWsUrl, hlsPlaylistUrl } from "@/lib/runtime-url";
 import type { PoleStatus } from "@/lib/api/pole";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -43,7 +43,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!accessToken) return;
-    const wsUrl = env.NEXT_PUBLIC_WS_URL + `?token=${accessToken}`;
+    const wsUrl = buildWsUrl(accessToken);
     const ws = new WebSocket(wsUrl);
     ws.onmessage = (ev) => {
       try {
@@ -77,9 +77,7 @@ export default function DashboardPage() {
   );
 
   // ── Live stream URL — เปลี่ยน key เพื่อ remount HlsPlayer เมื่อเปลี่ยนเสา ────
-  const liveStreamUrl = selected?.hasCamera
-    ? `${env.NEXT_PUBLIC_HLS_BASE}/live/${selected.poleName}.m3u8`
-    : null;
+  const liveStreamUrl = selected?.hasCamera ? hlsPlaylistUrl(selected.poleName) : null;
 
   return (
     <div className="h-full overflow-y-auto p-4 md:p-6 space-y-4">

@@ -2,18 +2,12 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useAuthStore } from "@/stores/auth-store";
-import { env } from "@/config/env";
+import { buildWsUrl } from "@/lib/runtime-url";
 
 type MessageHandler = (data: unknown) => void;
 
 const RECONNECT_INTERVAL = 3_000;
 const PING_INTERVAL = 30_000;
-
-function buildWsUrl(token: string): string {
-  const httpUrl = env.NEXT_PUBLIC_API_URL;
-  const wsUrl = httpUrl.replace(/^http/, "ws");
-  return `${wsUrl}/ws?token=${encodeURIComponent(token)}`;
-}
 
 export function useWebSocket(onMessage: MessageHandler): void {
   const onMessageRef = useRef(onMessage);

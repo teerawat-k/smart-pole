@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import { env } from "@/config/env";
+import { cameraClipStreamUrl } from "@/lib/runtime-url";
 
 export interface ClipItem {
   filename: string;
@@ -25,9 +25,9 @@ export const cameraClipApi = {
     );
     return res.data.data;
   },
-  /** absolute URL สำหรับ <video src> — Range request handled by browser */
+  /** URL สำหรับ <video src> — Range request handled by browser */
   buildStreamUrl: (poleName: string, date: string, file: string): string => {
     const qs = new URLSearchParams({ date, file });
-    return `${env.NEXT_PUBLIC_API_URL}/api/cameras/${encodeURIComponent(poleName)}/stream?${qs.toString()}`;
+    return cameraClipStreamUrl(poleName, qs.toString());
   },
 };

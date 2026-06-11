@@ -1,10 +1,10 @@
 import axios, { type InternalAxiosRequestConfig } from "axios";
 import qs from "qs";
-import { env } from "@/config/env";
+import { apiBase } from "@/lib/runtime-url";
 import { useAuthStore } from "@/stores/auth-store";
 
 export const apiClient = axios.create({
-  baseURL: env.NEXT_PUBLIC_API_URL,
+  baseURL: apiBase(),   // empty = relative URL (axios resolve เทียบ page origin)
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
   paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
