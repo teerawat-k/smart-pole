@@ -49,10 +49,8 @@ export default function PolesPage() {
   const setMaintenance = useSetMaintenance();
   const { confirm, AlertDialogComponent } = useAppAlertDialog();
   const { hasPermission } = usePermission();
+  // Page-level button — hasPermission OK (page guard / menu visibility ยกเว้นใน CLAUDE.md)
   const canCreate = hasPermission("pole:create");
-  const canEdit   = hasPermission("pole:edit");
-  const canDelete = hasPermission("pole:delete");
-  const canRowAction = canEdit || canDelete;
 
   function handleSort(column: string, direction: "asc" | "desc" | null) {
     setSort(direction ? { column, direction } : undefined);
@@ -123,55 +121,59 @@ export default function PolesPage() {
         </span>
       ),
     },
-    ...(canRowAction ? [{
+    {
       title: "",
       key: "actions",
       width: "fit" as const,
       fixed: "right" as const,
-      render: (r: PoleListItem) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="icon-sm" variant="ghost" aria-label="เมนู">
-              <WrenchIcon className="h-3.5 w-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {canEdit && (
-              <DropdownMenuItem onClick={() => handleEdit(r.id)}>
-                <Pencil className="mr-2 h-4 w-4" />แก้ไข
-              </DropdownMenuItem>
-            )}
-            {canEdit && (r.poleStatus === "maintenance" ? (
-              <DropdownMenuItem onClick={() => confirm({
-                title: "ยกเลิกบำรุงรักษา",
-                description: `นำเสา "${r.poleName}" ออกจากโหมดบำรุงรักษา?`,
-                onAction: () => setMaintenance.mutate({ id: r.id, enabled: false }),
-              })}>
-                <Wrench className="mr-2 h-4 w-4" />ยกเลิกบำรุงรักษา
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem onClick={() => confirm({
-                title: "ตั้งเป็นบำรุงรักษา",
-                description: `ตั้งเสา "${r.poleName}" เป็นโหมดบำรุงรักษา?`,
-                onAction: () => setMaintenance.mutate({ id: r.id, enabled: true }),
-              })}>
-                <Wrench className="mr-2 h-4 w-4" />ตั้งเป็นบำรุงรักษา
-              </DropdownMenuItem>
-            ))}
-            {canEdit && canDelete && <DropdownMenuSeparator />}
-            {canDelete && (
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                onClick={() => handleDelete(r)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />ลบ
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    }] : []),
-  ], [confirm, setMaintenance, deletePole, canRowAction, canEdit, canDelete]);
+      render: (r: PoleListItem) => {
+        // ใช้ flag ต่อ row (ห้าม hasPermission ตาม CLAUDE.md)
+        if (!r.canEdit && !r.canDelete) return null;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon-sm" variant="ghost" aria-label="เมนู">
+                <WrenchIcon className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {r.canEdit && (
+                <DropdownMenuItem onClick={() => handleEdit(r.id)}>
+                  <Pencil className="mr-2 h-4 w-4" />แก้ไข
+                </DropdownMenuItem>
+              )}
+              {r.canEdit && (r.poleStatus === "maintenance" ? (
+                <DropdownMenuItem onClick={() => confirm({
+                  title: "ยกเลิกบำรุงรักษา",
+                  description: `นำเสา "${r.poleName}" ออกจากโหมดบำรุงรักษา?`,
+                  onAction: () => setMaintenance.mutate({ id: r.id, enabled: false }),
+                })}>
+                  <Wrench className="mr-2 h-4 w-4" />ยกเลิกบำรุงรักษา
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={() => confirm({
+                  title: "ตั้งเป็นบำรุงรักษา",
+                  description: `ตั้งเสา "${r.poleName}" เป็นโหมดบำรุงรักษา?`,
+                  onAction: () => setMaintenance.mutate({ id: r.id, enabled: true }),
+                })}>
+                  <Wrench className="mr-2 h-4 w-4" />ตั้งเป็นบำรุงรักษา
+                </DropdownMenuItem>
+              ))}
+              {r.canEdit && r.canDelete && <DropdownMenuSeparator />}
+              {r.canDelete && (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                  onClick={() => handleDelete(r)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />ลบ
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ], [confirm, setMaintenance, deletePole]);
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-4 h-full overflow-hidden">

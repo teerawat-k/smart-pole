@@ -38,10 +38,8 @@ export default function UsersPage() {
 
   const me = useAuthStore((s) => s.user);
   const { hasPermission } = usePermission();
+  // Page-level button — hasPermission OK (CLAUDE.md ยกเว้น menu visibility + page guard)
   const canCreate = hasPermission("user:create");
-  const canEdit   = hasPermission("user:edit");
-  const canDelete = hasPermission("user:delete");
-  const canRowAction = canEdit || canDelete;
   const users = useUsers({
     page, limit,
     search: debouncedSearch || undefined,
@@ -107,53 +105,57 @@ export default function UsersPage() {
         </span>
       ),
     },
-    ...(canRowAction ? [{
+    {
       title: "",
       key: "actions",
       width: "fit" as const,
       fixed: "right" as const,
-      render: (r: UserListItem) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="action"><UserCog className="h-4 w-4" /></Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {canEdit && (
-              <DropdownMenuItem onClick={() => { setEditingId(r.id); setDialogOpen(true); }}>แก้ไข</DropdownMenuItem>
-            )}
-            {canEdit && (
-              <DropdownMenuItem onClick={() => setResetTarget({ id: r.id, username: r.username })}>
-                <KeyRound className="mr-2 h-4 w-4" />ตั้งรหัสผ่านใหม่
-              </DropdownMenuItem>
-            )}
-            {canEdit && r.status === "locked" && (
-              <DropdownMenuItem onClick={() => confirm({ title: "ปลดล็อกผู้ใช้", description: `ปลดล็อก ${r.username}?`, onAction: () => unlock.mutate(r.id) })}>
-                <Lock className="mr-2 h-4 w-4" />ปลดล็อก
-              </DropdownMenuItem>
-            )}
-            {canEdit && r.status === "active" && r.id !== me?.id && (
-              <DropdownMenuItem onClick={() => confirm({ title: "ปิดใช้งาน", description: `ปิดใช้งาน ${r.username}?`, onAction: () => setStatus.mutate({ id: r.id, status: "disabled" }), actionVariant: "destructive" })}>
-                <UserX className="mr-2 h-4 w-4" />ปิดใช้งาน
-              </DropdownMenuItem>
-            )}
-            {canEdit && r.status === "disabled" && (
-              <DropdownMenuItem onClick={() => setStatus.mutate({ id: r.id, status: "active" })}>เปิดใช้งาน</DropdownMenuItem>
-            )}
-            {canEdit && canDelete && <DropdownMenuSeparator />}
-            {canDelete && (
-              <DropdownMenuItem
-                className="text-destructive"
-                disabled={r.id === me?.id}
-                onClick={() => confirm({ title: "ลบผู้ใช้", description: `ต้องการลบ ${r.username}?`, onAction: () => deleteUser.mutate(r.id), actionText: "ลบ", actionVariant: "destructive" })}
-              >
-                ลบ
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    }] : []),
-  ], [me, confirm, unlock, setStatus, deleteUser, canRowAction, canEdit, canDelete]);
+      render: (r: UserListItem) => {
+        // ใช้ flag ต่อ row (ห้าม hasPermission ตาม CLAUDE.md)
+        if (!r.canEdit && !r.canDelete) return null;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="action"><UserCog className="h-4 w-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {r.canEdit && (
+                <DropdownMenuItem onClick={() => { setEditingId(r.id); setDialogOpen(true); }}>แก้ไข</DropdownMenuItem>
+              )}
+              {r.canEdit && (
+                <DropdownMenuItem onClick={() => setResetTarget({ id: r.id, username: r.username })}>
+                  <KeyRound className="mr-2 h-4 w-4" />ตั้งรหัสผ่านใหม่
+                </DropdownMenuItem>
+              )}
+              {r.canEdit && r.status === "locked" && (
+                <DropdownMenuItem onClick={() => confirm({ title: "ปลดล็อกผู้ใช้", description: `ปลดล็อก ${r.username}?`, onAction: () => unlock.mutate(r.id) })}>
+                  <Lock className="mr-2 h-4 w-4" />ปลดล็อก
+                </DropdownMenuItem>
+              )}
+              {r.canEdit && r.status === "active" && r.id !== me?.id && (
+                <DropdownMenuItem onClick={() => confirm({ title: "ปิดใช้งาน", description: `ปิดใช้งาน ${r.username}?`, onAction: () => setStatus.mutate({ id: r.id, status: "disabled" }), actionVariant: "destructive" })}>
+                  <UserX className="mr-2 h-4 w-4" />ปิดใช้งาน
+                </DropdownMenuItem>
+              )}
+              {r.canEdit && r.status === "disabled" && (
+                <DropdownMenuItem onClick={() => setStatus.mutate({ id: r.id, status: "active" })}>เปิดใช้งาน</DropdownMenuItem>
+              )}
+              {r.canEdit && r.canDelete && <DropdownMenuSeparator />}
+              {r.canDelete && (
+                <DropdownMenuItem
+                  className="text-destructive"
+                  disabled={r.id === me?.id}
+                  onClick={() => confirm({ title: "ลบผู้ใช้", description: `ต้องการลบ ${r.username}?`, onAction: () => deleteUser.mutate(r.id), actionText: "ลบ", actionVariant: "destructive" })}
+                >
+                  ลบ
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ], [me, confirm, unlock, setStatus, deleteUser]);
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-4 h-full overflow-hidden">
