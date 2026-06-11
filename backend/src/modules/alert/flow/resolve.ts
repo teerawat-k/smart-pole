@@ -36,7 +36,7 @@ export async function resolveAlert(
 export async function autoResolveOpenForPole(
   poleId: number,
   alertType: string,
-  systemUserId: number,
+  systemUserId: number | null,
 ): Promise<number> {
   const existing = await alertRepository.findOpenForPole(poleId, alertType);
   if (!existing) return 0;

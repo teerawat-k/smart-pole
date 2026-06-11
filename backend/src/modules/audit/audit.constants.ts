@@ -28,5 +28,7 @@ export const AuditAction = {
 
 export type AuditActionValue = (typeof AuditAction)[keyof typeof AuditAction];
 
-/** System user ID (สำหรับ audit ที่ไม่มี user เช่น MQTT handler, cron job) */
-export const SYSTEM_USER_ID = 0;
+/** System user marker — null = action จาก system (MQTT handler, cron, heartbeat)
+ *  Schema: User.id เป็น Int + AuditLog.userId เป็น Int? (nullable) → null = system
+ *  ห้ามตั้งเป็น 0 — จะ FK violation เพราะไม่มี user id=0 */
+export const SYSTEM_USER_ID: null = null;

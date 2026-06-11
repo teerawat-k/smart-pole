@@ -87,7 +87,7 @@ export const alertRepository = {
     });
   },
 
-  async resolve(id: number, resolvedById: number, note?: string, tx?: PrismaTx) {
+  async resolve(id: number, resolvedById: number | null, note?: string, tx?: PrismaTx) {
     const client = tx ?? prisma;
     return client.alert.update({
       where: { id },
