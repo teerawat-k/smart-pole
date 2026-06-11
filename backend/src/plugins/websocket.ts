@@ -4,6 +4,7 @@
 import { Elysia, t } from "elysia";
 import { jwtAccessPlugin } from "./jwt";
 import { logger } from "./logger";
+import { wsConnectionsGauge } from "./metrics";
 
 interface WsLike {
   send: (msg: string) => void;
@@ -12,15 +13,23 @@ interface WsLike {
 
 const connections = new Map<number, Set<WsLike>>();
 
+function syncMetric(): void {
+  let total = 0;
+  for (const set of connections.values()) total += set.size;
+  wsConnectionsGauge.set(total);
+}
+
 // ── Register / unregister ─────────────────────────────────
 export function addConnection(userId: number, ws: WsLike): void {
   if (!connections.has(userId)) connections.set(userId, new Set());
   connections.get(userId)!.add(ws);
+  syncMetric();
 }
 
 export function removeConnection(userId: number, ws: WsLike): void {
   connections.get(userId)?.delete(ws);
   if (connections.get(userId)?.size === 0) connections.delete(userId);
+  syncMetric();
 }
 
 export function getConnectedUserIds(): number[] {

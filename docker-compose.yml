@@ -90,6 +90,62 @@ services:
   # เพราะ server แชร์กับ project อื่น (wanasub.com) — nginx ที่ host ครอง 80/443 อยู่แล้ว
   # ดู infra/nginx/ สำหรับ server block + setup script
 
+  # ─── Prometheus (metrics scraper, internal only) ───────────────────────────
+  prometheus:
+    image: prom/prometheus:v3.0.0
+    container_name: smart-pole-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./volumes/prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    environment:
+      TZ: Asia/Bangkok
+    networks:
+      - smart-pole-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  # ─── Grafana (dashboards, proxied via nginx /grafana/) ─────────────────────
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: smart-pole-grafana
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:7795:3000'   # bind localhost — nginx proxy เท่านั้น
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./volumes/grafana-data:/var/lib/grafana
+    environment:
+      TZ: Asia/Bangkok
+      GF_SECURITY_ADMIN_USER: ${GF_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-changeme-on-first-login}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      # Sub-path support — nginx /grafana/ → grafana:3000/
+      GF_SERVER_ROOT_URL: 'https://152.42.242.162/grafana/'
+      GF_SERVER_SERVE_FROM_SUB_PATH: 'true'
+      # ลด anonymous tracking
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+    depends_on:
+      prometheus:
+        condition: service_started
+    networks:
+      - smart-pole-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+
   # ─── Frontend (Next.js) ────────────────────────────────────────────────────
   frontend:
     image: ${DOCKERHUB_USERNAME:-teerawatk}/smart-pole-frontend:${IMAGE_TAG:-latest}

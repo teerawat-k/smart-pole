@@ -6,12 +6,14 @@ import { sensorMessageSchema } from "../schemas";
 import { prisma } from "@/plugins/prisma";
 import { logger } from "@/plugins/logger";
 import { broadcastSensorReading } from "@/plugins/websocket";
+import { mqttMessagesTotal } from "@/plugins/metrics";
 import { Prisma } from "@prisma/client";
 
 export async function handleSensorMessage(poleName: string, raw: unknown): Promise<void> {
   const parsed = sensorMessageSchema.safeParse(raw);
   if (!parsed.success) {
     logger.warn({ poleName, errors: parsed.error.flatten() }, "MQTT sensor: validation failed");
+    mqttMessagesTotal.labels("sensor", "invalid").inc();
     return;
   }
   const msg = parsed.data;
@@ -23,6 +25,7 @@ export async function handleSensorMessage(poleName: string, raw: unknown): Promi
   });
   if (!pole) {
     logger.warn({ poleName }, "MQTT sensor: pole not found");
+    mqttMessagesTotal.labels("sensor", "unknown_pole").inc();
     return;
   }
 
@@ -50,4 +53,5 @@ export async function handleSensorMessage(poleName: string, raw: unknown): Promi
   ]);
 
   broadcastSensorReading(poleName, "sensor", { poleName, ...msg });
+  mqttMessagesTotal.labels("sensor", "ok").inc();
 }

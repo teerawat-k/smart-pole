@@ -24,8 +24,10 @@ import { websocketPlugin } from "./plugins/websocket";
 import { startMqttSubscriber, stopMqttSubscriber } from "./plugins/mqtt";
 import { heartbeatScanService } from "./modules/heartbeat-scan";
 import { stopAllJobs } from "./plugins/scheduler";
+import { metricsPlugin, startMetricsPollers, stopMetricsPollers } from "./plugins/metrics";
 
 const app = new Elysia()
+  .use(metricsPlugin)              // expose /metrics + record HTTP timing (ก่อน security headers ที่ block /metrics)
   .use(securityHeadersPlugin)
   // CORS รองรับ multi-origin (comma-separated ใน env) — เช่น http://...:7765 (direct) + https://... (Caddy)
   .use(cors({
@@ -106,10 +108,14 @@ try {
   logger.error({ err }, "Scheduler: failed to start");
 }
 
+// ── Start metrics pollers (refresh pole gauges every 30s) ──
+startMetricsPollers();
+
 // ── Graceful shutdown ─────────────────────────────────────
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, "Shutting down...");
   stopAllJobs();
+  stopMetricsPollers();
   await stopMqttSubscriber().catch(() => undefined);
   await app.stop();
   await prisma.$disconnect();
