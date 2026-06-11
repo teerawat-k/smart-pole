@@ -86,37 +86,9 @@ services:
         max-file: '5'
         compress: 'true'
 
-  # ─── Caddy reverse proxy (HTTPS termination) ───────────────────────────────
-  # หน้าใน: /api → backend, /ws → backend WS, /hls → SRS HLS, / → frontend
-  # tls internal = self-signed cert (browser warning ครั้งแรก — ดู infra/caddy/README.md)
-  # Upgrade เป็น Let's Encrypt: เปลี่ยน Caddyfile site address เป็น domain
-  caddy:
-    image: caddy:2-alpine
-    container_name: smart-pole-caddy
-    restart: unless-stopped
-    ports:
-      - '80:80'      # HTTP → redirect HTTPS
-      - '443:443'    # HTTPS termination
-    volumes:
-      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./volumes/caddy-data:/data
-      - ./volumes/caddy-config:/config
-    environment:
-      TZ: Asia/Bangkok
-    depends_on:
-      backend:
-        condition: service_started
-      frontend:
-        condition: service_started
-      srs:
-        condition: service_started
-    networks:
-      - smart-pole-network
-    logging:
-      driver: 'json-file'
-      options:
-        max-size: '10m'
-        max-file: '3'
+  # Note: HTTPS termination ใช้ nginx ที่ติดตั้งบน host (ไม่ใช่ใน docker)
+  # เพราะ server แชร์กับ project อื่น (wanasub.com) — nginx ที่ host ครอง 80/443 อยู่แล้ว
+  # ดู infra/nginx/ สำหรับ server block + setup script
 
   # ─── Frontend (Next.js) ────────────────────────────────────────────────────
   frontend:

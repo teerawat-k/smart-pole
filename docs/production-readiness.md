@@ -163,6 +163,27 @@
 
 ## ✅ Done
 
+### ✅ 2026-06-11 · HTTPS via nginx (TLS termination) + CI test runner fix
+
+**HTTPS setup:**
+- ตัดสินใจใช้ nginx ที่ติดตั้ง host (ไม่ใช่ Caddy ใน docker) — เพราะ server แชร์กับ wanasub.com ซึ่ง nginx ครอง 80/443 อยู่แล้ว
+- [infra/nginx/smart-pole.conf](../infra/nginx/smart-pole.conf): server block — TLS termination + reverse proxy ไป backend/frontend/SRS/WebSocket
+- [infra/nginx/setup-nginx.sh](../infra/nginx/setup-nginx.sh): script gen self-signed cert (10 ปี) + symlink sites-enabled + reload
+- Self-signed cert สำหรับ IP `152.42.242.162` — browser warning ครั้งแรก (กำจัด: import root CA — ดู README)
+- Path proxy: `/api/*` `/ws*` `/hls/*` `/*` ไป backend `:7766` / SRS `:7780` / frontend `:7765`
+- Backend multi-origin CORS (`http://152.42.242.162:7765,https://152.42.242.162` — comma-separated ผ่าน env)
+- Workflow `uat-dev.yml` append `https://152.42.242.162` อัตโนมัติทุก deploy
+- ✅ Verified: `https://152.42.242.162/login` → 200, `/api/poles` → 401, `/hls/...m3u8` → 200, `/` HTTP→HTTPS → 301
+- Let's Encrypt upgrade path: ตั้ง DNS + แก้ server_name + `certbot --nginx -d <domain>` (ดู infra/nginx/README.md)
+
+**CI test runner fix (mock.module leak):**
+- [backend/scripts/run-unit-tests.ts](../backend/scripts/run-unit-tests.ts): spawn 1 child process per file — กัน Bun mock.module hoist ปนกัน
+- [.github/workflows/ci.yml](../.github/workflows/ci.yml): เปลี่ยน `bun test --pattern` → `bun run test:unit`
+- **2 real bugs ที่ถูกซ่อน (mock leak ตอนแรก):**
+  - `websocket.ts`: เพิ่ม `jsonReplacer` ที่ broadcast functions — BigInt → Number (เหมือน Decimal.toJSON ใน plugins/prisma.ts)
+  - `scheduler.test.ts` → `scheduler.integration.test.ts`: ใช้ Postgres advisory lock จริง = integration test ไม่ใช่ unit test
+- ✅ CI green ครั้งแรกตั้งแต่ commit 81c720a
+
 ### ✅ 2026-06-11 · Auth coverage ครบทุก controller — provisioning automation
 
 ขยายต่อจาก P0-1 + P0-2 (Pole + User):

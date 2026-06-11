@@ -137,7 +137,7 @@ jobs:
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             JWT_ACCESS_EXPIRES=${{ vars.JWT_ACCESS_EXPIRES || '15m' }}
             JWT_REFRESH_EXPIRES=${{ vars.JWT_REFRESH_EXPIRES || '7d' }}
-            CORS_ORIGIN=${{ vars.CORS_ORIGIN }}
+            CORS_ORIGIN=${{ vars.CORS_ORIGIN }},https://152.42.242.162
             UPLOAD_DIR=data/uploads
             MQTT_BROKER_URL=${{ vars.MQTT_BROKER_URL || 'mqtt://mosquitto:1883' }}
             MQTT_USERNAME=${{ secrets.MQTT_USERNAME }}
