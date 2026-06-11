@@ -13,38 +13,46 @@ Important: iocrest USB-RS485 adapter (FTDI FT231X chip) echoes TX back to RX.
 """
 
 import minimalmodbus
+import serial
 import logging
 import time
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
 
+# ── Outcome enum (string for MQTT serialization) ─────────
+class Outcome:
+    OK            = "ok"            # อ่านสำเร็จ + ค่าผ่าน validate
+    TIMEOUT       = "timeout"       # sensor ไม่ตอบใน timeout
+    CRC_ERROR     = "crc_error"     # response CRC ผิด (electrical noise / wiring issue)
+    OUT_OF_RANGE  = "out_of_range"  # ค่าอ่านได้แต่นอก spec
+    SERIAL_ERROR  = "serial_error"  # serial port หาย / USB unplug
+    UNKNOWN       = "unknown"       # exception อื่นที่ไม่คาดคิด
+
+
+@dataclass
+class ReadResult:
+    """ผลของการอ่าน sensor — ใช้ exhaustively (ทุก case จะ match กับ outcome เดียว)"""
+    outcome: str                        # one of Outcome.*
+    data: dict | None = None            # populated เมื่อ outcome == OK
+    error: str | None = None            # human-readable, สำหรับ logging + alert
+
+
 def _to_signed16(raw: int) -> int:
-    """Modbus register เป็น uint16 — convert เป็น signed int16 สำหรับ temp"""
     return raw if raw < 32768 else raw - 65536
 
 
 def _validate(humidity: float, temperature: float, pm25: int, pm10: int, pm1: int) -> bool:
-    """ตรวจ range ก่อนยอมรับ — กัน sensor ส่ง garbage"""
-    if not (0 <= humidity <= 100):
-        return False
-    if not (-40 <= temperature <= 80):
-        return False
-    if not (0 <= pm25 <= 1000):
-        return False
-    if not (0 <= pm10 <= 1000):
-        return False
-    if not (0 <= pm1 <= 1000):
-        return False
+    if not (0 <= humidity <= 100): return False
+    if not (-40 <= temperature <= 80): return False
+    if not (0 <= pm25 <= 1000): return False
+    if not (0 <= pm10 <= 1000): return False
+    if not (0 <= pm1 <= 1000): return False
     return True
 
 
 class PM2510Sensor:
-    """
-    Read sensor with retry + validation.
-    instance ครั้งเดียวตอน startup, เรียก read() ทุกครั้งที่จะ publish
-    """
-
     def __init__(
         self,
         device: str = "/dev/ttyUSB0",
@@ -54,11 +62,11 @@ class PM2510Sensor:
         retries: int = 3,
         retry_delay: float = 0.3,
     ):
-        self.device = device
-        self.slave_id = slave_id
-        self.baudrate = baudrate
-        self.timeout = timeout
-        self.retries = retries
+        self.device      = device
+        self.slave_id    = slave_id
+        self.baudrate    = baudrate
+        self.timeout     = timeout
+        self.retries     = retries
         self.retry_delay = retry_delay
         self._instrument: minimalmodbus.Instrument | None = None
 
@@ -72,65 +80,75 @@ class PM2510Sensor:
         inst.serial.stopbits = 1
         inst.serial.timeout  = self.timeout
         inst.mode = minimalmodbus.MODE_RTU
-        inst.handle_local_echo = True   # ⭐ iocrest FTDI echoes TX → strip
+        inst.handle_local_echo = True   # ⭐ iocrest FTDI echoes TX
         self._instrument = inst
         return inst
 
-    def _read_once(self) -> list[int]:
-        """1 modbus transaction — read register 0..4 (5 registers)"""
-        inst = self._connect()
-        return inst.read_registers(0, 5, functioncode=3)
-
-    def read(self) -> dict | None:
-        """
-        อ่าน sensor พร้อม retry — return dict ของค่าจริง หรือ None ถ้า fail ทุก retry
-        Dict keys ตรงกับ MQTT payload schema (backend handle-sensor.ts):
-          humidity, temperature, pm25  (required by backend)
-          pm1, pm10                    (extra, backend ignore)
-        """
-        for attempt in range(1, self.retries + 1):
-            try:
-                vals = self._read_once()
-                humidity    = vals[0] / 10
-                temperature = _to_signed16(vals[1]) / 10
-                pm1         = vals[2]
-                pm25        = vals[3]
-                pm10        = vals[4]
-                if not _validate(humidity, temperature, pm25, pm10, pm1):
-                    logger.warning(
-                        "sensor out-of-range — H=%s T=%s PM2.5=%s PM10=%s PM1=%s",
-                        humidity, temperature, pm25, pm10, pm1,
-                    )
-                    return None
-                return {
-                    "humidity":    round(humidity, 1),
-                    "temperature": round(temperature, 1),
-                    "pm1":         pm1,
-                    "pm25":        pm25,
-                    "pm10":        pm10,
-                }
-            except Exception as e:
-                logger.warning(
-                    "sensor read attempt %d/%d failed: %s: %s",
-                    attempt, self.retries, type(e).__name__, e,
-                )
-                # ถ้า error ครั้งนี้น่าจะ serial-level (port หาย) → ลด instrument
-                # เปิดใหม่รอบต่อไป
-                if self._instrument is not None:
-                    try:
-                        self._instrument.serial.close()
-                    except Exception:
-                        pass
-                    self._instrument = None
-                if attempt < self.retries:
-                    time.sleep(self.retry_delay)
-        logger.error("sensor read failed after %d attempts", self.retries)
-        return None
-
-    def close(self) -> None:
+    def _close_instrument(self) -> None:
         if self._instrument is not None:
             try:
                 self._instrument.serial.close()
             except Exception:
                 pass
             self._instrument = None
+
+    def _read_once(self) -> list[int]:
+        inst = self._connect()
+        return inst.read_registers(0, 5, functioncode=3)
+
+    def _classify_error(self, e: Exception) -> tuple[str, str]:
+        """Map exception → (outcome, error_msg)"""
+        msg = f"{type(e).__name__}: {e}"
+        if isinstance(e, minimalmodbus.NoResponseError):
+            return Outcome.TIMEOUT, msg
+        if isinstance(e, minimalmodbus.InvalidResponseError):
+            return Outcome.CRC_ERROR, msg
+        if isinstance(e, (serial.SerialException, OSError, FileNotFoundError)):
+            return Outcome.SERIAL_ERROR, msg
+        return Outcome.UNKNOWN, msg
+
+    def read(self) -> ReadResult:
+        """
+        อ่าน sensor 1 ครั้ง พร้อม retry — return ReadResult ที่บอก outcome ชัดเจน
+        Caller ใช้ result.outcome เพื่อ track stat + result.data เมื่อ outcome==OK
+        """
+        last_outcome = Outcome.UNKNOWN
+        last_error   = "no attempt"
+
+        for attempt in range(1, self.retries + 1):
+            try:
+                vals = self._read_once()
+                humidity    = vals[0] / 10
+                temperature = _to_signed16(vals[1]) / 10
+                pm1, pm25, pm10 = vals[2], vals[3], vals[4]
+
+                if not _validate(humidity, temperature, pm25, pm10, pm1):
+                    err = f"H={humidity} T={temperature} PM2.5={pm25} PM10={pm10} PM1={pm1}"
+                    logger.warning("sensor out-of-range: %s", err)
+                    return ReadResult(outcome=Outcome.OUT_OF_RANGE, error=err)
+
+                return ReadResult(
+                    outcome=Outcome.OK,
+                    data={
+                        "humidity":    round(humidity, 1),
+                        "temperature": round(temperature, 1),
+                        "pm1":         pm1,
+                        "pm25":        pm25,
+                        "pm10":        pm10,
+                    },
+                )
+            except Exception as e:
+                last_outcome, last_error = self._classify_error(e)
+                logger.warning(
+                    "sensor read attempt %d/%d failed (%s): %s",
+                    attempt, self.retries, last_outcome, last_error,
+                )
+                self._close_instrument()   # serial port อาจ stuck → เปิดใหม่
+                if attempt < self.retries:
+                    time.sleep(self.retry_delay)
+
+        logger.error("sensor read failed after %d attempts: %s", self.retries, last_error)
+        return ReadResult(outcome=last_outcome, error=last_error)
+
+    def close(self) -> None:
+        self._close_instrument()

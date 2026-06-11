@@ -1,12 +1,13 @@
 // ── MQTT client singleton ──────────────────────────────────
-// Subscribe smartpole/+/sensor (wildcard ครอบทุกเสา), dispatch ไป handler ตาม messageType
+// Subscribe wildcard ครอบทุกเสา + ทุก messageType, dispatch ไป handler
 import mqtt, { type MqttClient } from "mqtt";
 import { env } from "@/config/env";
 import { logger } from "@/plugins/logger";
 import { parseTopic } from "./parse-topic";
 import { handleSensorMessage } from "./handlers/handle-sensor";
+import { handleHealthMessage } from "./handlers/handle-health";
 
-const SENSOR_TOPIC_PATTERN = "smartpole/+/sensor" as const;
+const TOPIC_PATTERNS = ["smartpole/+/sensor", "smartpole/+/health"] as const;
 
 let client: MqttClient | null = null;
 
@@ -33,8 +34,10 @@ export function startMqttSubscriber(): void {
 
   client.on("connect", () => {
     logger.info("MQTT: connected");
-    client?.subscribe(SENSOR_TOPIC_PATTERN, { qos: 1 });
-    logger.info({ pattern: SENSOR_TOPIC_PATTERN }, "MQTT: subscribed");
+    for (const pattern of TOPIC_PATTERNS) {
+      client?.subscribe(pattern, { qos: 1 });
+      logger.info({ pattern }, "MQTT: subscribed");
+    }
   });
 
   client.on("reconnect", () => logger.warn("MQTT: reconnecting..."));
@@ -60,6 +63,9 @@ export function startMqttSubscriber(): void {
       switch (parsedTopic.messageType) {
         case "sensor":
           await handleSensorMessage(parsedTopic.poleName, json);
+          break;
+        case "health":
+          await handleHealthMessage(parsedTopic.poleName, json);
           break;
         default: {
           // exhaustive — type-checker จะ error เมื่อเพิ่ม MessageType แล้วไม่ handle

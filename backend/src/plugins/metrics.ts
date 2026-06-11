@@ -47,6 +47,16 @@ export const mqttMessagesTotal = new Counter({
   registers: [registry],
 });
 
+// ── Sensor health (per-pole observability) ──
+// Reported by Pi via smartpole/<pole>/health every cycle
+// outcome = ok | timeout | crc_error | out_of_range | serial_error | unknown
+export const sensorReadsTotal = new Counter({
+  name: "sensor_reads_total",
+  help: "Sensor read attempts on Pi (reported via /health MQTT topic)",
+  labelNames: ["pole", "outcome"] as const,
+  registers: [registry],
+});
+
 // ── Domain gauges (updated from outside) ──
 export const polesOnlineGauge = new Gauge({
   name: "smart_pole_poles_online",

@@ -16,3 +16,17 @@ export const sensorMessageSchema = z.object({
 });
 
 export type SensorMessage = z.infer<typeof sensorMessageSchema>;
+
+/**
+ * smartpole/<poleName>/health
+ *
+ * Pi ส่งทุก cycle (ทั้ง success/failure) — backend ใช้ track sensor_reads_total{outcome}
+ * outcome = ok | timeout | crc_error | out_of_range | serial_error | unknown
+ */
+export const healthMessageSchema = z.object({
+  timestamp: z.number().int().min(0),
+  outcome:   z.enum(["ok", "timeout", "crc_error", "out_of_range", "serial_error", "unknown"]),
+  error:     z.string().max(200).optional(),
+});
+
+export type HealthMessage = z.infer<typeof healthMessageSchema>;

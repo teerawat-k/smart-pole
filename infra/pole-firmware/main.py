@@ -1,18 +1,24 @@
 """
 Smart Pole Pi firmware — main MQTT publisher
 
-Reads PM2510TH-OD sensor every SENSOR_INTERVAL sec and publishes to MQTT.
-Topic: smartpole/<POLE_NAME>/sensor
-Payload: { timestamp, seq, humidity, temperature, pm1, pm25, pm10 }
+ทุก SENSOR_INTERVAL วินาที:
+  1. อ่าน sensor (PM2510TH-OD via Modbus RTU)
+  2. ถ้า OK → publish ค่าจริงไป smartpole/<pole>/sensor
+  3. ทุกครั้ง (OK หรือ fail) → publish health event ไป smartpole/<pole>/health
+     เพื่อให้ backend track sensor_reads_total{result=...} ผ่าน Prometheus
+
+Backend handler:
+  - handle-sensor.ts: รับ /sensor → บันทึก SensorReading + อัปเดต Pole.latest*
+  - handle-health.ts: รับ /health → เพิ่ม counter sensor_reads_total
 """
 
 import paho.mqtt.client as mqtt
 import json
 import time
 import logging
-from sensor import PM2510Sensor
+from sensor import PM2510Sensor, Outcome
 
-# ── Config (provision-pi.sh sed lines ตรงนี้) ─────────
+# ── Config ────────────────────────────────────────────
 BROKER     = "152.42.242.162"
 PORT       = 7783
 USERNAME   = "smartpole"
@@ -22,10 +28,11 @@ POLE_NAME  = "pole-01"
 SENSOR_DEVICE   = "/dev/ttyUSB0"
 SENSOR_BAUD     = 9600
 SENSOR_SLAVE_ID = 1
-SENSOR_INTERVAL = 60   # 1 นาที — backend อ่าน real-time ได้ดีกว่า 5 นาที
+SENSOR_INTERVAL = 60
 
-# ── Topic ─────────────────────────────────────────────
+# ── Topics ────────────────────────────────────────────
 SENSOR_TOPIC = f"smartpole/{POLE_NAME}/sensor"
+HEALTH_TOPIC = f"smartpole/{POLE_NAME}/health"
 
 # ── Logging ───────────────────────────────────────────
 logging.basicConfig(
@@ -55,7 +62,7 @@ client.on_disconnect = on_disconnect
 client.reconnect_delay_set(min_delay=5, max_delay=60)
 
 
-# ── Sensor instance — reuse connection ───────────────
+# ── Sensor instance ──────────────────────────────────
 sensor = PM2510Sensor(
     device=SENSOR_DEVICE,
     slave_id=SENSOR_SLAVE_ID,
@@ -63,51 +70,71 @@ sensor = PM2510Sensor(
 )
 
 
-def send_sensor(seq: int) -> bool:
-    """อ่าน + publish 1 รอบ — return True ถ้าสำเร็จ"""
-    reading = sensor.read()
-    if reading is None:
-        log.warning(f"seq={seq} sensor read failed — skip publish")
-        return False
-
+def publish_sensor(seq: int, data: dict) -> None:
     payload = {
         "timestamp": int(time.time() * 1000),
         "seq":       seq,
-        **reading,   # humidity, temperature, pm1, pm25, pm10
+        **data,   # humidity, temperature, pm1, pm25, pm10
     }
     info = client.publish(SENSOR_TOPIC, json.dumps(payload), qos=1)
     info.wait_for_publish(timeout=5)
-    log.info(
-        f"seq={seq} published — "
-        f"H={reading['humidity']}% T={reading['temperature']}°C "
-        f"PM1={reading['pm1']} PM2.5={reading['pm25']} PM10={reading['pm10']}"
-    )
-    return True
+
+
+def publish_health(outcome: str, error: str | None) -> None:
+    """ส่งทุกครั้ง — backend ใช้ count outcome ต่อ pole"""
+    payload = {
+        "timestamp": int(time.time() * 1000),
+        "outcome":   outcome,
+    }
+    if error:
+        payload["error"] = error[:200]   # cap length
+    info = client.publish(HEALTH_TOPIC, json.dumps(payload), qos=1)
+    info.wait_for_publish(timeout=5)
+
+
+def tick(seq: int) -> int:
+    """อ่าน sensor → publish ที่เหมาะสม → return next seq"""
+    result = sensor.read()
+
+    # ส่ง health ทุกครั้ง (สำคัญสำหรับ metrics + alert)
+    publish_health(result.outcome, result.error)
+
+    if result.outcome == Outcome.OK and result.data:
+        publish_sensor(seq, result.data)
+        log.info(
+            f"seq={seq} ok — H={result.data['humidity']}% "
+            f"T={result.data['temperature']}°C "
+            f"PM1={result.data['pm1']} PM2.5={result.data['pm25']} PM10={result.data['pm10']}"
+        )
+        return seq + 1
+
+    # Sensor read fail — skip /sensor publish, แค่ /health
+    log.warning(f"seq={seq} skipped — outcome={result.outcome} error={result.error}")
+    return seq   # ไม่ increment เพราะไม่ได้ publish sensor data
 
 
 # ── Main ──────────────────────────────────────────────
 def main():
     log.info(f"Smart Pole starting — {POLE_NAME}")
-    log.info(f"MQTT topic: {SENSOR_TOPIC}")
+    log.info(f"Sensor topic: {SENSOR_TOPIC}")
+    log.info(f"Health topic: {HEALTH_TOPIC}")
     log.info(f"Sensor: {SENSOR_DEVICE} @ {SENSOR_BAUD} bps, slave={SENSOR_SLAVE_ID}")
     log.info(f"Interval: every {SENSOR_INTERVAL}s")
 
     client.connect(BROKER, PORT, keepalive=60)
     client.loop_start()
-    time.sleep(2)  # รอ MQTT handshake
+    time.sleep(2)
 
     seq = 1
-    send_sensor(seq)
-    seq += 1
-    last_sensor = time.time()
+    seq = tick(seq)
+    last_tick = time.time()
 
     try:
         while True:
             now = time.time()
-            if now - last_sensor >= SENSOR_INTERVAL:
-                send_sensor(seq)
-                seq += 1
-                last_sensor = now
+            if now - last_tick >= SENSOR_INTERVAL:
+                seq = tick(seq)
+                last_tick = now
             time.sleep(2)
     except KeyboardInterrupt:
         log.info("Shutting down...")
