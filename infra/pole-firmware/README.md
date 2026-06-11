@@ -53,37 +53,69 @@ Cost: 2× transcode CPU = ~110% ของ 1 core (Pi 4 มี 4 cores พอเ�
 ```
 (script จาก `infra/host-scripts/cleanup-camera-clips.sh`)
 
-## Deploy บน Pi ใหม่
+## Deploy บน Pi ใหม่ — Automated (~3 นาที)
+
+ใช้ `provision-pi.sh` แทน manual steps:
 
 ```bash
-# 1. Copy ไฟล์
-sudo mkdir -p /home/pi/smartpole
-sudo cp main.py stream-rtmp.sh /home/pi/smartpole/
-sudo chown -R pi:pi /home/pi/smartpole
-sudo chmod +x /home/pi/smartpole/stream-rtmp.sh
+# จาก dev machine (มี ssh + scp + plink)
+cd infra/pole-firmware
 
-# 2. Setup Python venv (ครั้งแรกเท่านั้น)
+./provision-pi.sh \
+  --pole-name pole-02 \
+  --install-place "ทางเข้าอาคาร B" \
+  --pi-host 192.168.1.148 \
+  --pi-pass ABcd12!! \
+  --rtsp-ip 192.168.1.109 \
+  --rtsp-pass admin-password \
+  --has-camera --has-pm25 --has-temp-humidity
+```
+
+Script จะทำให้อัตโนมัติ:
+1. SSH ไป DO → รัน `backend/scripts/create-pole.ts` สร้างเสาใน DB + gen MQTT credential
+2. SCP scripts ทั้งหมดไป Pi
+3. sed แทน POLE_NAME, MQTT credentials, RTSP URL ใน scripts
+4. Setup SSH key Pi → DO (สำหรับ rsync recordings)
+5. Install systemd units (smartpole + smartpole-stream + smartpole-record) + enable
+6. Install crontab (sync ทุก 5 นาที + cleanup ตี 3)
+7. Verify: HLS endpoint + TCP RTMP + TCP MQTT
+8. Print MQTT password (เก็บไว้ — ไม่แสดงอีก)
+
+> Pi venv (`paho-mqtt`, `minimalmodbus`, `pyserial`) ต้อง setup ครั้งแรกบน Pi เอง:
+> ```bash
+> python3 -m venv /home/pi/smartpole-env
+> /home/pi/smartpole-env/bin/pip install paho-mqtt minimalmodbus pyserial
+> ```
+
+## Manual deploy (ถ้าจำเป็น)
+
+```bash
+# 1. Copy + edit configs
+sudo mkdir -p /home/pi/smartpole
+sudo cp *.py *.sh /home/pi/smartpole/
+sudo chown -R pi:pi /home/pi/smartpole
+sudo chmod +x /home/pi/smartpole/*.sh
+
+# 2. Setup Python venv
 python3 -m venv /home/pi/smartpole-env
 /home/pi/smartpole-env/bin/pip install paho-mqtt minimalmodbus pyserial
 
 # 3. Install systemd units
-sudo cp smartpole.service smartpole-stream.service /etc/systemd/system/
+sudo cp smartpole*.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now smartpole smartpole-stream
-sudo systemctl status smartpole smartpole-stream
+sudo systemctl enable --now smartpole smartpole-stream smartpole-record
 ```
 
-## Configuration ที่ต้องแก้ก่อน deploy
+### Configuration ที่ต้องแก้ใน scripts (ถ้า manual)
 
 ใน `main.py`:
-- `POLE_NAME` — ตั้งให้ตรงกับชื่อใน DB (เช่น `pole-02`, `pole-03`)
-- `USERNAME`, `PASSWORD` — MQTT credentials จาก backend (`POST /api/poles` หรือ `regenerate-credential`)
-- `BROKER`, `PORT` — broker endpoint (production: `152.42.242.162:7783` UAT)
+- `POLE_NAME` — ตั้งให้ตรงกับชื่อใน DB
+- `USERNAME`, `PASSWORD` — MQTT credentials จาก `POST /api/poles`
+- `BROKER`, `PORT` — broker endpoint
 
-ใน `stream-rtmp.sh`:
+ใน `stream-rtmp.sh` + `record-mp4.sh`:
 - `POLE_NAME` — เหมือนใน main.py
-- `RTSP_URL` — IP/credential ของกล้อง Dahua (อ่าน [docs/integration/hardware-specs.md](../../docs/integration/hardware-specs.md))
-- `RTMP_URL` — SRS endpoint
+- `RTSP_URL` — IP/credential ของกล้อง Dahua
 
 ## Notes
 
