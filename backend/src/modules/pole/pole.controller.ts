@@ -6,14 +6,11 @@ import {
   poleUpdateSchema,
   poleMaintenanceSchema,
 } from "./pole.schema";
-
-// TODO: wrap ด้วย authGuard + requirePermission
-function getUserId(headers: Record<string, string | undefined>): number {
-  const raw = headers["x-user-id"];
-  return raw ? Number(raw) : 1;
-}
+import { authGuard } from "@/plugins/jwt";
+import { requirePermission } from "@/common/middleware/require-permission";
 
 export const poleController = new Elysia({ prefix: "/api/poles" })
+  .use(authGuard)
   .get(
     "/",
     async ({ query }) => {
@@ -28,7 +25,7 @@ export const poleController = new Elysia({ prefix: "/api/poles" })
       });
       return { success: true, ...result, page: query.page, limit: query.limit };
     },
-    { query: poleListQuery },
+    { query: poleListQuery, beforeHandle: requirePermission("pole:view") },
   )
   .get("/lookup", async () => {
     const data = await poleService.lookup();
@@ -40,49 +37,66 @@ export const poleController = new Elysia({ prefix: "/api/poles" })
       const data = await poleService.getById(params.id);
       return { success: true, data };
     },
-    { params: t.Object({ id: t.Numeric({ minimum: 1 }) }) },
+    {
+      params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
+      beforeHandle: requirePermission("pole:view"),
+    },
   )
   .post(
     "/",
-    async ({ body, headers }) => {
-      const data = await poleService.create(body, getUserId(headers));
+    async ({ body, user }) => {
+      const data = await poleService.create(body, user.id);
       return { success: true, data, message: "สร้างเสาสำเร็จ — โปรดบันทึก MQTT password (จะไม่แสดงอีก)" };
     },
-    { body: poleCreateSchema },
+    { body: poleCreateSchema, beforeHandle: requirePermission("pole:create") },
   )
   .patch(
     "/:id",
-    async ({ params, body, headers }) => {
-      const data = await poleService.update(params.id, body, getUserId(headers));
+    async ({ params, body, user }) => {
+      const data = await poleService.update(params.id, body, user.id);
       return { success: true, data, message: "อัปเดตเสาสำเร็จ" };
     },
-    { params: t.Object({ id: t.Numeric({ minimum: 1 }) }), body: poleUpdateSchema },
+    {
+      params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
+      body: poleUpdateSchema,
+      beforeHandle: requirePermission("pole:edit"),
+    },
   )
   .post(
     "/:id/maintenance",
-    async ({ params, body, headers }) => {
-      const data = await poleService.setMaintenance(params.id, body, getUserId(headers));
+    async ({ params, body, user }) => {
+      const data = await poleService.setMaintenance(params.id, body, user.id);
       return { success: true, data, message: body.enabled ? "เปิดโหมดบำรุงรักษา" : "ปิดโหมดบำรุงรักษา" };
     },
-    { params: t.Object({ id: t.Numeric({ minimum: 1 }) }), body: poleMaintenanceSchema },
+    {
+      params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
+      body: poleMaintenanceSchema,
+      beforeHandle: requirePermission("pole:edit"),
+    },
   )
   .post(
     "/:id/regenerate-credential",
-    async ({ params, headers }) => {
-      const data = await poleService.regenerateCredential(params.id, getUserId(headers));
+    async ({ params, user }) => {
+      const data = await poleService.regenerateCredential(params.id, user.id);
       return {
         success: true,
         data,
         message: "Regenerate MQTT credential สำเร็จ — โปรดบันทึก password (จะไม่แสดงอีก)",
       };
     },
-    { params: t.Object({ id: t.Numeric({ minimum: 1 }) }) },
+    {
+      params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
+      beforeHandle: requirePermission("pole:edit"),
+    },
   )
   .delete(
     "/:id",
-    async ({ params, headers }) => {
-      await poleService.delete(params.id, getUserId(headers));
+    async ({ params, user }) => {
+      await poleService.delete(params.id, user.id);
       return { success: true, message: "ลบเสาสำเร็จ" };
     },
-    { params: t.Object({ id: t.Numeric({ minimum: 1 }) }) },
+    {
+      params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
+      beforeHandle: requirePermission("pole:delete"),
+    },
   );

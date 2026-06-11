@@ -9,14 +9,11 @@ import {
   userMyProfileUpdateSchema,
   userChangePasswordSchema,
 } from "./user.schema";
-
-// TODO(E01+): wrap ด้วย authPlugin + requirePermission เมื่อ auth พร้อม
-function getUserId(headers: Record<string, string | undefined>): number {
-  const raw = headers["x-user-id"];
-  return raw ? Number(raw) : 1; // default admin
-}
+import { authGuard } from "@/plugins/jwt";
+import { requirePermission } from "@/common/middleware/require-permission";
 
 export const userController = new Elysia({ prefix: "/api/users" })
+  .use(authGuard)
   .get(
     "/",
     async ({ query }) => {
@@ -31,7 +28,7 @@ export const userController = new Elysia({ prefix: "/api/users" })
       });
       return { success: true, ...result, page: query.page, limit: query.limit };
     },
-    { query: userListQuery },
+    { query: userListQuery, beforeHandle: requirePermission("user:view") },
   )
   .get("/lookup", async () => {
     const data = await userService.lookup();
@@ -43,75 +40,97 @@ export const userController = new Elysia({ prefix: "/api/users" })
       const data = await userService.getById(params.id);
       return { success: true, data };
     },
-    { params: t.Object({ id: t.Numeric({ minimum: 1 }) }) },
+    {
+      params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
+      beforeHandle: requirePermission("user:view"),
+    },
   )
   .post(
     "/",
-    async ({ body, headers }) => {
-      const data = await userService.create(body, getUserId(headers));
+    async ({ body, user }) => {
+      const data = await userService.create(body, user.id);
       return { success: true, data, message: "สร้างผู้ใช้งานสำเร็จ" };
     },
-    { body: userCreateSchema },
+    { body: userCreateSchema, beforeHandle: requirePermission("user:create") },
   )
   .patch(
     "/:id",
-    async ({ params, body, headers }) => {
-      const data = await userService.update(params.id, body, getUserId(headers));
+    async ({ params, body, user }) => {
+      const data = await userService.update(params.id, body, user.id);
       return { success: true, data, message: "อัปเดตผู้ใช้งานสำเร็จ" };
     },
-    { params: t.Object({ id: t.Numeric({ minimum: 1 }) }), body: userUpdateSchema },
+    {
+      params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
+      body: userUpdateSchema,
+      beforeHandle: requirePermission("user:edit"),
+    },
   )
   .patch(
     "/:id/status",
-    async ({ params, body, headers }) => {
-      const data = await userService.setStatus(params.id, body, getUserId(headers));
+    async ({ params, body, user }) => {
+      const data = await userService.setStatus(params.id, body, user.id);
       return { success: true, data, message: "เปลี่ยนสถานะผู้ใช้งานสำเร็จ" };
     },
-    { params: t.Object({ id: t.Numeric({ minimum: 1 }) }), body: userStatusSchema },
+    {
+      params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
+      body: userStatusSchema,
+      beforeHandle: requirePermission("user:edit"),
+    },
   )
   .post(
     "/:id/unlock",
-    async ({ params, headers }) => {
-      const data = await userService.unlock(params.id, getUserId(headers));
+    async ({ params, user }) => {
+      const data = await userService.unlock(params.id, user.id);
       return { success: true, data, message: "ปลดล็อกผู้ใช้งานสำเร็จ" };
     },
-    { params: t.Object({ id: t.Numeric({ minimum: 1 }) }) },
+    {
+      params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
+      beforeHandle: requirePermission("user:edit"),
+    },
   )
   .post(
     "/:id/reset-password",
-    async ({ params, body, headers }) => {
-      const data = await userService.resetPassword(params.id, body, getUserId(headers));
+    async ({ params, body, user }) => {
+      const data = await userService.resetPassword(params.id, body, user.id);
       return { success: true, data, message: "รีเซ็ตรหัสผ่านสำเร็จ" };
     },
-    { params: t.Object({ id: t.Numeric({ minimum: 1 }) }), body: userResetPasswordSchema },
+    {
+      params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
+      body: userResetPasswordSchema,
+      beforeHandle: requirePermission("user:edit"),
+    },
   )
   .delete(
     "/:id",
-    async ({ params, headers }) => {
-      await userService.delete(params.id, getUserId(headers));
+    async ({ params, user }) => {
+      await userService.delete(params.id, user.id);
       return { success: true, message: "ลบผู้ใช้งานสำเร็จ" };
     },
-    { params: t.Object({ id: t.Numeric({ minimum: 1 }) }) },
+    {
+      params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
+      beforeHandle: requirePermission("user:delete"),
+    },
   );
 
-// ── My profile (separate prefix) ──
+// ── My profile (auth-only — no permission) ──
 export const meController = new Elysia({ prefix: "/api/me" })
-  .get("/", async ({ headers }) => {
-    const data = await userService.getMyProfile(getUserId(headers));
+  .use(authGuard)
+  .get("/", async ({ user }) => {
+    const data = await userService.getMyProfile(user.id);
     return { success: true, data };
   })
   .patch(
     "/",
-    async ({ body, headers }) => {
-      const data = await userService.updateMyProfile(body, getUserId(headers));
+    async ({ body, user }) => {
+      const data = await userService.updateMyProfile(body, user.id);
       return { success: true, data, message: "อัปเดตโปรไฟล์สำเร็จ" };
     },
     { body: userMyProfileUpdateSchema },
   )
   .patch(
     "/password",
-    async ({ body, headers }) => {
-      const data = await userService.changeMyPassword(body, getUserId(headers));
+    async ({ body, user }) => {
+      const data = await userService.changeMyPassword(body, user.id);
       return { success: true, data, message: "เปลี่ยนรหัสผ่านสำเร็จ" };
     },
     { body: userChangePasswordSchema },

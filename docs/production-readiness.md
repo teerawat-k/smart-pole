@@ -23,32 +23,13 @@
 - **Estimate:** ~1-2 ชม. ต่อ firmware update + 1-2 วัน UAT verification
 - **Status:** open — backend code พร้อมแล้ว, รอ Pi firmware
 
-### P0-1 · Pole controller ไม่มี auth จริง
+### ~~P0-1 · Pole controller ไม่มี auth จริง~~ ✅ FIXED 2026-06-11
 
-- **ที่อยู่:** [backend/src/modules/pole/pole.controller.ts:11-14](../backend/src/modules/pole/pole.controller.ts)
-- **ปัญหา:** `getUserId(headers)` อ่าน `x-user-id` header แบบ trust + fallback = `1` (admin) → ใครยิง HTTP request ตรงก็ทำ CRUD เสาได้ทุกอย่าง รวม `regenerate-credential`
-- **comment ใน code:** `// TODO: wrap ด้วย authGuard + requirePermission`
-- **วิธีแก้:**
-  1. import `authGuard` จาก [backend/src/plugins/auth.ts](../backend/src/plugins/auth.ts) (มีอยู่แล้ว — ใช้ `derive({ as: "scoped" })` ตาม Elysia convention)
-  2. wrap controller ด้วย `.use(authGuard)` → ใช้ `({ user })` แทน `headers` — เลิก `getUserId` ทิ้ง
-  3. เพิ่ม `requirePermission("pole:create" | "pole:edit" | ...)` ต่อ endpoint ตาม permission seed
-  4. update test ที่ stub `x-user-id` → mock JWT แทน
-- **Endpoint ที่กระทบ:** 8 endpoints (`GET /` `GET /lookup` `GET /:id` `POST /` `PATCH /:id` `POST /:id/maintenance` `POST /:id/regenerate-credential` `DELETE /:id`)
-- **Estimate:** ~2 ชม. (รวม test)
-- **Status:** open
+- **commit:** ดู Done section ด้านล่าง
 
-### P0-2 · User controller ไม่มี auth จริง
+### ~~P0-2 · User controller ไม่มี auth จริง~~ ✅ FIXED 2026-06-11
 
-- **ที่อยู่:** [backend/src/modules/user/user.controller.ts:14-17](../backend/src/modules/user/user.controller.ts)
-- **ปัญหา:** เหมือน P0-1 — `getUserId(headers)` trust `x-user-id` header + fallback admin → ใครก็สร้าง/ลบ/unlock user ได้
-- **วิธีแก้:**
-  1. wrap `userController` + `meController` ด้วย `authGuard`
-  2. `userController` endpoints (admin-only) → `requirePermission("user:view|create|edit|delete")`
-  3. `meController` endpoints (self) → auth-only (ไม่ต้องมี permission)
-  4. update test เหมือน P0-1
-- **Endpoint ที่กระทบ:** `userController` 8 endpoints + `meController` 3 endpoints (`GET /api/me`, `PATCH /api/me`, `PATCH /api/me/password`)
-- **Estimate:** ~2.5 ชม. (รวม test + แยก permission check `me` vs `user`)
-- **Status:** open
+- **commit:** ดู Done section ด้านล่าง
 
 ### P0-3 · Rotate Postgres dev password ที่เคย commit
 
@@ -181,6 +162,21 @@
 ---
 
 ## ✅ Done
+
+### ✅ 2026-06-11 · P0-1 + P0-2 — Pole + User controller auth
+
+- **แก้:**
+  - สร้าง [backend/src/common/middleware/require-permission.ts](../backend/src/common/middleware/require-permission.ts) — Elysia `beforeHandle` helper พร้อม cache permissions per role 60s + admin bypass
+  - [pole.controller.ts](../backend/src/modules/pole/pole.controller.ts): wrap `.use(authGuard)` ทุก endpoint, `getUserId(headers)` → `user.id` (จาก JWT), เพิ่ม `requirePermission("pole:view|create|edit|delete")` ต่อ endpoint
+  - [user.controller.ts](../backend/src/modules/user/user.controller.ts): wrap `.use(authGuard)` ทุก endpoint + `requirePermission("user:...")`
+  - `meController` ใช้ `.use(authGuard)` แบบ auth-only (ไม่มี permission check — self-service)
+- **Permission mapping:**
+  - `GET /` `GET /:id` — `pole:view` / `user:view`
+  - `POST /` — `pole:create` / `user:create`
+  - `PATCH /:id` `PATCH /:id/status` `POST /:id/maintenance` `POST /:id/regenerate-credential` `POST /:id/unlock` `POST /:id/reset-password` — `pole:edit` / `user:edit`
+  - `DELETE /:id` — `pole:delete` / `user:delete`
+  - `GET /lookup` — auth-only (used by combobox)
+  - `GET/PATCH /api/me` — auth-only
 
 ### ✅ 2026-05-24 · MQTT username inconsistency — แก้ `generate-credential` ให้ตรงกับ seed
 
