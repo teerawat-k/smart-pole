@@ -333,9 +333,55 @@ model Sensor<Type> {
 
 ## Auth & RBAC
 
-- JWT: `{ sub: number, role: string, iat, exp }` — 1 user = 1 role, userId จาก JWT เสมอ
-- Permission: `module:action`, cached per role, `requirePermission()` เป็น `beforeHandle`
-- `GET /` + `GET /lookup`: auth เท่านั้น — list ส่ง ready-to-use flags (`canEdit`, `canCancel`)
+- JWT: `{ sub: number, role: string, tokenVersion, iat, exp }` — 1 user = 1 role, userId จาก JWT เสมอ
+- Permission: `module:action`, cached per role 60s, admin role bypass
+- Helper อยู่ที่ [common/middleware/require-permission.ts](src/common/middleware/require-permission.ts) — มี 2 ฟังก์ชัน
+
+### Controller pattern
+
+```ts
+import { authGuard } from "@/plugins/jwt";
+import { requirePermission, hasPermission } from "@/common/middleware/require-permission";
+
+export const fooController = new Elysia({ prefix: "/api/foos" })
+  .use(authGuard)                                                  // ทุก route ต้อง login
+  .get("/", async ({ query, user }) => {
+    const result = await fooService.list(query);
+    // enrich list — ห้ามให้ frontend คำนวณ flag เอง
+    const [canEdit, canDelete] = await Promise.all([
+      hasPermission(user, "foo:edit"),
+      hasPermission(user, "foo:delete"),
+    ]);
+    const data = result.data.map((it) => ({ ...it, canEdit, canDelete }));
+    return { success: true, data, total: result.total };
+  }, { beforeHandle: requirePermission("foo:view") })             // ใช้ requirePermission ใน beforeHandle
+  .get("/lookup", async () => /* ... */)                            // ⚠️ /lookup auth-only (ห้ามใส่ permission)
+  .post("/", handler, { beforeHandle: requirePermission("foo:create") })
+  .patch("/:id", handler, { beforeHandle: requirePermission("foo:edit") })
+  .delete("/:id", handler, { beforeHandle: requirePermission("foo:delete") });
+```
+
+### `requirePermission()` vs `hasPermission()`
+
+| ฟังก์ชัน | คืนค่า | ใช้เมื่อ |
+|---|---|---|
+| `requirePermission(...perms)` | throws `ForbiddenError` ถ้าไม่มี | `beforeHandle` ของ route ที่ต้อง gate |
+| `hasPermission(user, perm)` | `Promise<boolean>` | enrich list response ด้วย `canEdit`/`canDelete` flags |
+
+### `/lookup` endpoint
+- auth เท่านั้น (ห้ามใส่ `requirePermission`) — combobox ใช้ใน dialog หลายๆ ที่ ผู้ใช้ทุก role ต้อง access
+
+### Public file streaming (camera-clip `/stream`)
+- public route — browser `<video src>` ไม่ส่ง Authorization header
+- defense-in-depth: list endpoint (`/clips`) ต้อง auth → ผู้ใช้ไม่มี enumerate path; path validation regex กัน traversal
+- production: upgrade เป็น signed URL (issue 1-hour token ผ่าน `/clips` response)
+
+### Cache invalidation
+```ts
+import { invalidatePermissionCache } from "@/common/middleware/require-permission";
+// เมื่อ admin แก้ permissions ของ role ผ่าน UI → ต้อง invalidate
+invalidatePermissionCache(roleName);
+```
 
 ---
 

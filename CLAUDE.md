@@ -32,6 +32,14 @@ frontend/
 e2e/                    1 module = 1 folder, 1 action = 1 spec
 docs/                   test-scenarios (.md→.xlsx), delivery (.xlsx)
 planning/               PLANNING.md + epics/<E##>/tasks/<T##>.md
+
+infra/
+├── mosquitto/config/   mosquitto.conf + aclfile + passwordfile
+├── srs/srs.conf        SRS 5 — HLS-only mode (DVR ใน Pi side)
+├── pole-firmware/      Pi scripts (main.py, stream-rtmp.sh, record-mp4.sh,
+│                       sync-recordings.sh, cleanup-recordings.sh,
+│                       *.service systemd units, provision-pi.sh, README)
+└── host-scripts/       Scripts ที่ run บน DO host (cleanup-camera-clips.sh)
 ```
 
 ---
