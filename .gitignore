@@ -76,3 +76,9 @@ project-backup/
 # Reference assets (do not commit)
 SmartPole_Project.zip
 SmartPole_Database.sql
+
+# Local notes / Claude Code settings (added 2026-06-11 — never commit these)
+.claude/
+00-root-CLAUDE.md
+backend/01-backend-CLAUDE.md
+frontend/02-frontend-CLAUDE.md
