@@ -27,7 +27,12 @@ import { stopAllJobs } from "./plugins/scheduler";
 
 const app = new Elysia()
   .use(securityHeadersPlugin)
-  .use(cors({ origin: env.CORS_ORIGIN, methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"], exposeHeaders: ["x-request-id"] }))
+  // CORS รองรับ multi-origin (comma-separated ใน env) — เช่น http://...:7765 (direct) + https://... (Caddy)
+  .use(cors({
+    origin: env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean),
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    exposeHeaders: ["x-request-id"],
+  }))
   .use(swagger({ path: "/swagger" }))
   .use(staticPlugin({ prefix: "/uploads", assets: env.UPLOAD_DIR }))
   .use(requestIdPlugin)
