@@ -24,8 +24,10 @@ export interface LoginContext {
   userAgent?: string;
 }
 
+import type { VerifiedUser } from "./verify-credentials";
+
 export interface LoginResult {
-  user: { id: number; username: string; roleId: number; roleName: string; tokenVersion: number };
+  user: VerifiedUser;
   refreshToken: string;
   refreshExpiresAt: Date;
 }

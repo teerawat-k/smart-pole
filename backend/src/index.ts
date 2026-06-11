@@ -18,7 +18,7 @@ import { captchaController } from "./modules/captcha";
 import { poleController } from "./modules/pole";
 import { sensorArchiveController } from "./modules/sensor-archive";
 import { alertController } from "./modules/alert";
-import { cameraClipController } from "./modules/camera-clip";
+import { cameraClipController, cameraClipStreamController } from "./modules/camera-clip";
 import { systemLogController } from "./modules/system-log";
 import { websocketPlugin } from "./plugins/websocket";
 import { startMqttSubscriber, stopMqttSubscriber } from "./plugins/mqtt";
@@ -80,6 +80,7 @@ const app = new Elysia()
   .use(sensorArchiveController)
   .use(alertController)
   .use(cameraClipController)
+  .use(cameraClipStreamController)
   .use(systemLogController)
   .use(websocketPlugin)
   .listen(env.PORT);

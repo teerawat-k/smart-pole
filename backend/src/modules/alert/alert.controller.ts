@@ -1,13 +1,12 @@
 import { Elysia, t } from "elysia";
 import { alertService } from "./alert.service";
 import { alertListQuery, alertResolveSchema } from "./alert.schema";
+import { authGuard } from "@/plugins/jwt";
 
-function getUserId(headers: Record<string, string | undefined>): number {
-  const raw = headers["x-user-id"];
-  return raw ? Number(raw) : 1;
-}
-
+// Alert frontend UI removed (commit 9e40888) — backend ยังทำงาน + frontend ฟื้นกลับได้
+// ตอนนี้ auth-only (no permission seed สำหรับ alert) — ถ้าฟื้นกลับให้เพิ่ม alert:view + alert:resolve
 export const alertController = new Elysia({ prefix: "/api/alerts" })
+  .use(authGuard)
   .get(
     "/",
     async ({ query }) => {
@@ -27,8 +26,8 @@ export const alertController = new Elysia({ prefix: "/api/alerts" })
   )
   .post(
     "/:id/resolve",
-    async ({ params, body, headers }) => {
-      await alertService.resolve(params.id, getUserId(headers), body.note);
+    async ({ params, body, user }) => {
+      await alertService.resolve(params.id, user.id, body.note);
       return { success: true, message: "Resolve alert สำเร็จ" };
     },
     { params: t.Object({ id: t.Numeric({ minimum: 1 }) }), body: alertResolveSchema },

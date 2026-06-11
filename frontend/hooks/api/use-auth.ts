@@ -26,9 +26,9 @@ export function useLogin() {
         id: data.user.id,
         username: data.user.username,
         role: data.user.roleName,
-        name: data.user.username, // /me จะส่งชื่อจริงมาทีหลัง
-        isSystemRole: data.user.roleName === "admin", // approx — verify ผ่าน /me
-        permissions: [], // populated หลัง /me
+        name: `${data.user.firstName} ${data.user.lastName}`.trim() || data.user.username,
+        isSystemRole: data.user.isSystemRole,
+        permissions: data.user.permissions,
       };
       setAuth(user, data.accessToken, data.refreshToken);
       toast.success(data.user.username + " เข้าสู่ระบบสำเร็จ");

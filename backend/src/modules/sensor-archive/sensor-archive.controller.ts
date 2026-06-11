@@ -1,14 +1,20 @@
 import { Elysia, t } from "elysia";
 import { sensorArchiveService } from "./sensor-archive.service";
+import { authGuard } from "@/plugins/jwt";
+import { requirePermission } from "@/common/middleware/require-permission";
 
 export const sensorArchiveController = new Elysia()
+  .use(authGuard)
   .get(
     "/api/poles/:id/sensors/latest",
     async ({ params }) => {
       const data = await sensorArchiveService.latestForPole(params.id);
       return { success: true, data };
     },
-    { params: t.Object({ id: t.Numeric({ minimum: 1 }) }) },
+    {
+      params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
+      beforeHandle: requirePermission("sensor_archive:view", "dashboard:view"),
+    },
   )
   .get(
     "/api/poles/:id/sensors/history",
@@ -40,5 +46,6 @@ export const sensorArchiveController = new Elysia()
         sortBy:    t.Optional(t.String({ maxLength: 64 })),
         sortOrder: t.Optional(t.Union([t.Literal("asc"), t.Literal("desc")])),
       }),
+      beforeHandle: requirePermission("sensor_archive:view"),
     },
   );

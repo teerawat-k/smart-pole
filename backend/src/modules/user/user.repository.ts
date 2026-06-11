@@ -110,7 +110,20 @@ export const userRepository = {
   async findByUsername(username: string) {
     return prisma.user.findFirst({
       where: { username, deletedAt: null },
-      include: { role: { select: { id: true, name: true, isSystem: true } } },
+      include: {
+        role: {
+          select: {
+            id: true,
+            name: true,
+            isSystem: true,
+            permissions: {
+              select: {
+                permission: { select: { module: true, action: true } },
+              },
+            },
+          },
+        },
+      },
     });
   },
 

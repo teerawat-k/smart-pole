@@ -14,6 +14,9 @@ export interface UserListItem {
   lastLoginAt: string | null;
   createdAt: string;
   role: { id: number; name: string; description: string | null };
+  // Permission flags ที่ backend คำนวณตาม user role
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
 export interface UserDetail extends UserListItem {

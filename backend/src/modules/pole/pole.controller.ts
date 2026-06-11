@@ -7,13 +7,13 @@ import {
   poleMaintenanceSchema,
 } from "./pole.schema";
 import { authGuard } from "@/plugins/jwt";
-import { requirePermission } from "@/common/middleware/require-permission";
+import { requirePermission, hasPermission } from "@/common/middleware/require-permission";
 
 export const poleController = new Elysia({ prefix: "/api/poles" })
   .use(authGuard)
   .get(
     "/",
-    async ({ query }) => {
+    async ({ query, user }) => {
       const result = await poleService.list({
         page: query.page,
         limit: query.limit,
@@ -23,7 +23,13 @@ export const poleController = new Elysia({ prefix: "/api/poles" })
         sortBy: query.sortBy,
         sortOrder: query.sortOrder,
       });
-      return { success: true, ...result, page: query.page, limit: query.limit };
+      // inject permission flags ต่อ row (frontend ใช้ตรง ๆ — ห้ามคำนวณเอง)
+      const [canEdit, canDelete] = await Promise.all([
+        hasPermission(user, "pole:edit"),
+        hasPermission(user, "pole:delete"),
+      ]);
+      const data = result.data.map((p) => ({ ...p, canEdit, canDelete }));
+      return { success: true, data, total: result.total, page: query.page, limit: query.limit };
     },
     { query: poleListQuery, beforeHandle: requirePermission("pole:view") },
   )

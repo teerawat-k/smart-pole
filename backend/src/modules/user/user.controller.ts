@@ -10,13 +10,13 @@ import {
   userChangePasswordSchema,
 } from "./user.schema";
 import { authGuard } from "@/plugins/jwt";
-import { requirePermission } from "@/common/middleware/require-permission";
+import { requirePermission, hasPermission } from "@/common/middleware/require-permission";
 
 export const userController = new Elysia({ prefix: "/api/users" })
   .use(authGuard)
   .get(
     "/",
-    async ({ query }) => {
+    async ({ query, user }) => {
       const result = await userService.list({
         page: query.page,
         limit: query.limit,
@@ -26,7 +26,12 @@ export const userController = new Elysia({ prefix: "/api/users" })
         sortBy: query.sortBy,
         sortOrder: query.sortOrder,
       });
-      return { success: true, ...result, page: query.page, limit: query.limit };
+      const [canEdit, canDelete] = await Promise.all([
+        hasPermission(user, "user:edit"),
+        hasPermission(user, "user:delete"),
+      ]);
+      const data = result.data.map((u) => ({ ...u, canEdit, canDelete }));
+      return { success: true, data, total: result.total, page: query.page, limit: query.limit };
     },
     { query: userListQuery, beforeHandle: requirePermission("user:view") },
   )

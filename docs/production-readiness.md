@@ -163,6 +163,32 @@
 
 ## ✅ Done
 
+### ✅ 2026-06-11 · Auth coverage ครบทุก controller — provisioning automation
+
+ขยายต่อจาก P0-1 + P0-2 (Pole + User):
+- **role.controller.ts** — เพิ่ม `authGuard` + `requirePermission("role:view|create|edit|delete")` + invalidate cache เมื่อ PUT permissions
+- **audit.controller.ts** — auth + `requirePermission("system_log:view")` (admin function)
+- **system-log.controller.ts** — auth + `requirePermission("system_log:view")`
+- **sensor-archive.controller.ts** — auth + `requirePermission("sensor_archive:view"|"dashboard:view")`
+- **camera-clip.controller.ts** — split เป็น 2 sub-controller:
+  - List endpoints (`/latest`, `/clips`) — auth + `camera_archive:view`/`dashboard:view`
+  - Stream endpoint — public route (browser `<video src>` ไม่ส่ง Authorization header; path validation + list endpoint lock = defense in depth; upgrade เป็น signed URL ภายหลัง)
+- **alert.controller.ts** — auth-only (no permission seed สำหรับ alert; alert UI ถอดแล้ว backend ยังทำงาน)
+
+Permission flags ใน list response:
+- Backend `hasPermission(user, perm)` helper (อยู่ใน `common/middleware/require-permission.ts` ข้าง `requirePermission`)
+- `GET /api/poles` + `GET /api/users` enrich response ด้วย `canEdit`, `canDelete` ต่อ row
+- Frontend `PoleListItem.canEdit/canDelete` + `UserListItem.canEdit/canDelete` types updated
+
+Login response มี permissions ครบ:
+- `verify-credentials.ts` — `VerifiedUser` มี `firstName, lastName, isSystemRole, permissions[]`
+- `user.repository.findByUsername` join role.permissions
+- `use-auth.ts` populate AuthUser เต็มจาก login response (ไม่ต้องรอ /me)
+
+Provisioning automation:
+- `backend/scripts/create-pole.ts` — Bun CLI สร้าง pole + gen MQTT cred ผ่าน prisma direct
+- `infra/pole-firmware/provision-pi.sh` — 6-step automated Pi provisioning (~3 นาที vs 30 นาที manual)
+
 ### ✅ 2026-06-11 · P0-1 + P0-2 — Pole + User controller auth
 
 - **แก้:**

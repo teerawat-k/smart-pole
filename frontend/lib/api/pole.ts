@@ -36,6 +36,9 @@ export interface PoleListItem {
   hasLed: boolean;
   createdAt: string;
   updatedAt: string;
+  // Permission flags ที่ backend คำนวณตาม user role (ห้าม frontend คำนวณเอง — ใช้ flag ตรงๆ)
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
 export interface PoleLookupItem {

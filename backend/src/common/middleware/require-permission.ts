@@ -84,3 +84,23 @@ export function requirePermission(...required: string[]): (ctx: AuthedContext) =
     }
   };
 }
+
+/**
+ * Check permission แบบไม่ throw — ใช้ enrich list response ด้วย `canEdit`/`canDelete` flags
+ * (ตาม CLAUDE.md: frontend ต้องใช้ flags จาก list response ห้ามใช้ hasPermission() กับ action button)
+ *
+ * @example
+ *   const [canEdit, canDelete] = await Promise.all([
+ *     hasPermission(user, "pole:edit"),
+ *     hasPermission(user, "pole:delete"),
+ *   ]);
+ *   const enriched = items.map(it => ({ ...it, canEdit, canDelete }));
+ */
+export async function hasPermission(
+  user: { role: string },
+  perm: string,
+): Promise<boolean> {
+  if (user.role === ADMIN_ROLE) return true;
+  const perms = await getPermissions(user.role);
+  return perms.has(perm);
+}

@@ -5,8 +5,21 @@ import { verifyPassword } from "@/common/utils/password";
 import { computeLockout } from "./compute-lockout";
 import { FAIL_REASONS } from "../auth.constants";
 
+export interface VerifiedUser {
+  id: number;
+  username: string;
+  firstName: string;
+  lastName: string;
+  status: string;
+  roleId: number;
+  roleName: string;
+  isSystemRole: boolean;
+  permissions: string[];
+  tokenVersion: number;
+}
+
 export type VerifyResult =
-  | { ok: true; user: { id: number; username: string; status: string; roleId: number; roleName: string; tokenVersion: number } }
+  | { ok: true; user: VerifiedUser }
   | { ok: false; reason: keyof typeof FAIL_REASONS_REVERSE; remainingMinutes?: number; userId?: number; usernameSnap?: string };
 
 const FAIL_REASONS_REVERSE = {
@@ -84,9 +97,15 @@ export async function verifyCredentials(username: string, password: string): Pro
     user: {
       id: user.id,
       username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
       status: user.status,
       roleId: user.roleId,
       roleName: user.role.name,
+      isSystemRole: user.role.isSystem,
+      permissions: user.role.permissions.map(
+        (rp) => `${rp.permission.module}:${rp.permission.action}`,
+      ),
       tokenVersion: user.tokenVersion,
     },
   };

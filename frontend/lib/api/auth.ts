@@ -15,9 +15,13 @@ export interface LoginRequest {
 export interface LoginUser {
   id: number;
   username: string;
+  firstName: string;
+  lastName: string;
   status: string;
   roleId: number;
   roleName: string;
+  isSystemRole: boolean;
+  permissions: string[];
   tokenVersion: number;
 }
 

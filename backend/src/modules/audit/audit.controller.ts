@@ -1,10 +1,12 @@
 import { Elysia } from "elysia";
 import { auditService } from "./audit.service";
 import { auditListQuery } from "./audit.schema";
+import { authGuard } from "@/plugins/jwt";
+import { requirePermission } from "@/common/middleware/require-permission";
 
-// TODO(E08+): wrap ด้วย authPlugin + requirePermission("audit_log", "canView")
-// ตอนนี้ public ก่อน — ทำให้ frontend integration test ได้
+// audit log = admin/support เท่านั้น — ใช้ system_log:view ร่วมกัน (admin function)
 export const auditController = new Elysia({ prefix: "/api/audit-logs" })
+  .use(authGuard)
   .get(
     "/",
     async ({ query }) => {
@@ -26,5 +28,5 @@ export const auditController = new Elysia({ prefix: "/api/audit-logs" })
         limit: query.limit,
       };
     },
-    { query: auditListQuery },
+    { query: auditListQuery, beforeHandle: requirePermission("system_log:view") },
   );
