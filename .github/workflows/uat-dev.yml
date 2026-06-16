@@ -94,7 +94,7 @@ jobs:
           [[ "$WH" == https://* ]] && curl -H "Content-Type: application/json" -d "{\"username\": \"Smart-Pole\", \"avatar_url\": \"https://cdn-icons-png.flaticon.com/512/5065/5065647.png\", \"content\": \"\`🟣 [$(date +'%Y-%m-%d %H:%M:%S')] 📦 [BE] Deploying | Smart-Pole | Tag: ${{ env.IMAGE_TAG }}\`\"}" "$WH" || echo "DISCORD_WEBHOOK not configured — skip"
 
       - name: Copy compose file to server
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@v0.1.7    # pinned (was @master — broken intermittently 2026-06-16)
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
@@ -103,10 +103,12 @@ jobs:
           source: "docker-compose.yml,infra/"
           target: "${{ secrets.COMPOSE_PATH }}"
           overwrite: true
+          timeout: 60s
+          command_timeout: 10m
 
       - name: Deploy to Server via SSH
         id: deploy
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.0.3    # pinned
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
@@ -128,9 +130,13 @@ jobs:
             FRONTEND_PORT=${{ vars.FRONTEND_PORT || 7765 }}
             EOF
 
-            echo "📝 Creating backend/.env from secrets..."
+            # Generate backend/.env from secrets ONLY if not exists
+            # ป้องกัน CI overwrite manual rotation (JWT_SECRET, MQTT_PASSWORD ฯลฯ)
+            # ถ้าอยาก force rewrite: ssh เข้า server ลบ backend/.env แล้ว rerun
             mkdir -p backend
-            cat > backend/.env << EOF
+            if [ ! -s backend/.env ]; then
+              echo "📝 First-time: creating backend/.env from secrets..."
+              cat > backend/.env << EOF
             NODE_ENV=production
             PORT=${{ vars.BACKEND_PORT || 7766 }}
             DATABASE_URL=${{ secrets.DATABASE_URL }}
@@ -147,6 +153,12 @@ jobs:
             POLE_OFFLINE_THRESHOLD_MINUTES=${{ vars.POLE_OFFLINE_THRESHOLD_MINUTES || 5 }}
             LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
             EOF
+            else
+              echo "ℹ️  backend/.env exists ($(wc -l < backend/.env) lines) — preserving current values"
+              echo "   (ถ้าอยาก reset: ssh + rm backend/.env แล้ว rerun deploy)"
+              # Ensure non-secret defaults are up to date (ไม่ทับ secrets)
+              grep -q '^NODE_ENV=' backend/.env || echo 'NODE_ENV=production' >> backend/.env
+            fi
 
             echo "🔑 Logging into Docker Hub..."
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
@@ -275,7 +287,7 @@ jobs:
           [[ "$WH" == https://* ]] && curl -H "Content-Type: application/json" -d "{\"username\": \"Smart-Pole\", \"avatar_url\": \"https://cdn-icons-png.flaticon.com/512/5065/5065647.png\", \"content\": \"\`🟣 [$(date +'%Y-%m-%d %H:%M:%S')] 📦 [FE] Deploying | Smart-Pole | Tag: ${{ env.IMAGE_TAG }}\`\"}" "$WH" || echo "DISCORD_WEBHOOK not configured — skip"
 
       - name: Copy compose file to server
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@v0.1.7    # pinned (was @master)
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
@@ -284,10 +296,12 @@ jobs:
           source: "docker-compose.yml"
           target: "${{ secrets.COMPOSE_PATH }}"
           overwrite: true
+          timeout: 60s
+          command_timeout: 10m
 
       - name: Deploy to Server via SSH
         id: deploy
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.0.3    # pinned
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
