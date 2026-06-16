@@ -18,6 +18,7 @@ secrets/
 
 # Local-only configs (อาจมี credential)
 mosquitto-local.conf
+infra/mosquitto/config/passwordfile
 infra/mosquitto/passwordfile
 infra/mosquitto/passwd
 infra/mosquitto/acl.production
