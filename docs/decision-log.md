@@ -4,6 +4,45 @@
 
 ---
 
+## 2026-06-17 · P0 Security hardening — production-grade
+
+- **สถานการณ์:** Pi 5 migration เสร็จ + ระบบเริ่ม stable → ถึงเวลา harden ก่อน pilot launch จริง บางส่วนยังเป็น dev default (Mosquitto allow_anonymous, JWT secret อาจเป็น dev placeholder, Pi SSH password auth เปิด, ไม่มี global API rate limit)
+- **ตัดสินใจ:** apply 4 hardening items ใน 1 session:
+  1. Mosquitto enforce auth + per-pole ACL (anonymous off)
+  2. JWT secret rotate → 256-bit random (128 hex)
+  3. Pi 5 SSH key-only (PasswordAuthentication no)
+  4. Global API rate limit per IP (mutation 60/min, GET 200/min)
+- **เหตุผล:**
+  1. ทุก item เป็น industry standard — ไม่ใช่ optional ก่อน pilot ทดสอบกับ end-user
+  2. Mosquitto/ACL infrastructure พร้อมแล้วใน repo (commit เก่า) — แค่ uncomment + generate hash
+  3. Rate limit code มีอยู่แล้วสำหรับ login/refresh — ขยายเป็น global โดย wrap onRequest hook
+  4. Pi 5 พึ่ง migrate เสร็จ — clean state เหมาะกับ harden + ไม่กระทบ user ที่ใช้งานอยู่
+- **ผลที่ตามมา:**
+  - Bug discovery: `JWT_SECRET` ใน .env corrupt ด้วย Windows path mangling (Git Bash convert `/value` → `C:/Program Files/Git/value`) — แก้โดยใช้ stdin pipe แทน inline shell substitution
+  - CI/CD ล่มชั่วคราว 3 รอบ: `appleboy/scp-action@master` มี breaking change → pin `@v0.1.7` + เพิ่ม timeout + retry health check
+  - ทุก JWT token ที่ออกอยู่ใน production invalidate → user re-login (acceptable, dev/UAT user น้อย)
+  - บันทึกใน [security-hardening.md](./security-hardening.md) ครบขั้นตอน + rotation procedure
+
+---
+
+## 2026-06-16 · Pi 4 → Pi 5 hardware migration
+
+- **สถานการณ์:** Pi 4 1GB ใกล้เต็ม RAM (906 MB total, ใช้ swap 120 MB ตลอด) + อุณหภูมิ throttle ตอน ffmpeg load — ส่งผลต่อ video frame drop และ sensor latency
+- **ตัดสินใจ:** swap Pi 4 ออก → Pi 5 4 GB + active cooler + SDcard 32 GB ใหม่
+- **เหตุผล:**
+  1. Pi 5 RAM 4× → ไม่ swap + overhead ลด
+  2. CPU เร็ว 2-3× → ffmpeg preset upgrade possible
+  3. Active cooler → idle 39°C (vs Pi 4 ~50°C), load < 50°C (vs Pi 4 throttle)
+  4. clean fresh OS = ลดความเสี่ยง config drift
+- **ผลที่ตามมา:**
+  - สร้าง `infra/pole-firmware/migrate-pi.sh` script (skip backend create-pole + keep credentials)
+  - สร้าง runbook `MIGRATION-CHECKLIST.md` — replicable สำหรับ Pi ตัวต่อไป
+  - Downtime ~15 นาที (acceptable)
+  - Pi 5 hostname = `pole-001` (cosmetic — ไม่กระทบฟังก์ชัน)
+  - Bug discovery: `docker compose restart` ไม่ reload env_file → ต้องใช้ `docker compose up -d --force-recreate <service>`
+
+---
+
 ## 2026-05-24 · แก้ `.env.example` MQTT_BROKER_URL ให้ตรง default dev workflow
 
 - **สถานการณ์:** `.env.example` ตั้ง `MQTT_BROKER_URL=mqtt://localhost:1883` แต่ Mosquitto ใน `docker-compose.yml` map external port เป็น **7783** (internal 1883) → dev ที่ copy `.env.example` เป็น `.env` แล้วรัน `bun dev` ตรงบนเครื่อง (default workflow ตาม CLAUDE.md) จะเชื่อม MQTT ไม่ได้

@@ -7,6 +7,25 @@
 - 🟠 **P1** — สำคัญ, deploy ได้แต่ต้องตาม fix ภายใน 1-2 sprint
 - 🟡 **P2** — Nice to have, ทำเมื่อมีเวลา
 
+> 🔐 ดู [security-hardening.md](./security-hardening.md) สำหรับ security ที่ apply แล้ว + rotation procedure
+
+---
+
+### ~~P0-x · Mosquitto allow_anonymous=true ใน production~~ ✅ FIXED 2026-06-17
+
+- Mosquitto enforce auth + per-pole ACL — [security-hardening.md § 1](./security-hardening.md#-1-mosquitto-enforce-authentication)
+- **commit:** [3d2f5b3](https://github.com/teerawat-k/smart-pole/commit/3d2f5b3)
+
+### ~~P0-y · JWT secret = dev placeholder~~ ✅ FIXED 2026-06-17
+
+- Rotate 256-bit random — [security-hardening.md § 2](./security-hardening.md#-2-jwt-secret-rotation)
+- **commit:** manual rotation (ไม่ commit secret)
+
+### ~~P0-z · Pi SSH password auth + global API ไม่มี rate limit~~ ✅ FIXED 2026-06-17
+
+- Pi 5 SSH key-only + global API rate limit per IP
+- **commits:** [3d2f5b3](https://github.com/teerawat-k/smart-pole/commit/3d2f5b3)
+
 ---
 
 ## 🔴 P0 — Blockers
