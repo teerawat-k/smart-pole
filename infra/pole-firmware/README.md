@@ -14,6 +14,9 @@
 | `smartpole.service` | systemd unit สำหรับ `main.py` | `/etc/systemd/system/smartpole.service` |
 | `smartpole-stream.service` | systemd unit สำหรับ `stream-rtmp.sh` (live) | `/etc/systemd/system/smartpole-stream.service` |
 | `smartpole-record.service` | systemd unit สำหรับ `record-mp4.sh` (DVR) | `/etc/systemd/system/smartpole-record.service` |
+| `sensor.py` | PM2510TH-OD sensor driver (Modbus RTU) | `/home/pi/smartpole/sensor.py` |
+| `provision-pi.sh` | สคริปต์ **เพิ่ม pole ใหม่** (สร้าง DB + ลง Pi) | (รันจาก dev machine) |
+| `migrate-pi.sh` | สคริปต์ **สลับ Pi hardware** ของเสาที่มีอยู่แล้ว | (รันจาก dev machine) |
 
 ## DVR Architecture
 
