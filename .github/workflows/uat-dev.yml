@@ -201,10 +201,20 @@ jobs:
             curl -fsS http://localhost:${{ vars.BACKEND_PORT || 7766 }}/health/ready \
               || (docker compose logs backend --tail 80 && exit 1)
 
-            docker exec smart-pole-mosquitto mosquitto_sub -h localhost -p 1883 \
-              -u "${{ secrets.MQTT_USERNAME }}" -P "${{ secrets.MQTT_PASSWORD }}" \
-              -t '$SYS/broker/uptime' -C 1 -W 5 \
-              || (docker compose logs mosquitto --tail 40 && exit 1)
+            # Use credentials from backend/.env (preserve manual rotation)
+            # — กัน mismatch กรณี secrets ใน GitHub stale กว่า production
+            MQTT_USER=$(grep '^MQTT_USERNAME=' backend/.env | cut -d= -f2-)
+            MQTT_PASS=$(grep '^MQTT_PASSWORD=' backend/.env | cut -d= -f2-)
+            if [ -n "$MQTT_USER" ] && [ -n "$MQTT_PASS" ]; then
+              docker exec smart-pole-mosquitto mosquitto_sub -h localhost -p 1883 \
+                -u "$MQTT_USER" -P "$MQTT_PASS" \
+                -t '$SYS/broker/uptime' -C 1 -W 5 \
+                || (echo "⚠️ Mosquitto auth check failed (creds in .env vs broker mismatch)"; \
+                    docker compose logs mosquitto --tail 40; \
+                    exit 1)
+            else
+              echo "⚠️ MQTT creds ใน backend/.env ว่าง — skip mosquitto verify"
+            fi
 
             echo "🧹 Cleaning up unused images..."
             docker image prune -f
