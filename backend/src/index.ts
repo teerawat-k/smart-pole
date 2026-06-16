@@ -25,9 +25,11 @@ import { startMqttSubscriber, stopMqttSubscriber } from "./plugins/mqtt";
 import { heartbeatScanService } from "./modules/heartbeat-scan";
 import { stopAllJobs } from "./plugins/scheduler";
 import { metricsPlugin, startMetricsPollers, stopMetricsPollers } from "./plugins/metrics";
+import { globalRateLimitPlugin } from "./common/middleware/global-rate-limit";
 
 const app = new Elysia()
   .use(metricsPlugin)              // expose /metrics + record HTTP timing (ก่อน security headers ที่ block /metrics)
+  .use(globalRateLimitPlugin)      // per-IP rate limit ทุก /api/* (skip auth/login + auth/refresh ที่มี limit เอง)
   .use(securityHeadersPlugin)
   // CORS รองรับ multi-origin (comma-separated ใน env) — เช่น http://...:7765 (direct) + https://... (Caddy)
   .use(cors({
