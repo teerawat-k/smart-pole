@@ -10,7 +10,7 @@
 | `stream-rtmp.sh` | ffmpeg RTMP push → SRS (live playback) | `/home/pi/smartpole/stream-rtmp.sh` |
 | `record-mp4.sh` | ffmpeg segment mp4 30 นาที (DVR) | `/home/pi/smartpole/record-mp4.sh` |
 | `sync-recordings.sh` | rsync mp4 ที่บันทึก → DO ทุก 5 นาที (cron) | `/home/pi/smartpole/sync-recordings.sh` |
-| `cleanup-recordings.sh` | ลบ clip > 3 วันบน Pi (cron daily 3am) | `/home/pi/smartpole/cleanup-recordings.sh` |
+| `cleanup-recordings.sh` | ลบ clip > 36 ชม.บน Pi (cron ทุก 6 ชม.) | `/home/pi/smartpole/cleanup-recordings.sh` |
 | `smartpole.service` | systemd unit สำหรับ `main.py` | `/etc/systemd/system/smartpole.service` |
 | `smartpole-stream.service` | systemd unit สำหรับ `stream-rtmp.sh` (live) | `/etc/systemd/system/smartpole-stream.service` |
 | `smartpole-record.service` | systemd unit สำหรับ `record-mp4.sh` (DVR) | `/etc/systemd/system/smartpole-record.service` |
@@ -32,7 +32,7 @@ Backend camera-clip service (filesystem browser)
 Dashboard /camera page
 
 Retention:
-  Pi 3 วัน (cron daily 3am)
+  Pi 36 ชม. (cron ทุก 6 ชม.)
   DO 7 วัน (cron daily 4am)
 ```
 
@@ -46,7 +46,7 @@ Cost: 2× transcode CPU = ~110% ของ 1 core (Pi 4 มี 4 cores พอเ�
 
 ```cron
 */5 * * * * /home/pi/smartpole/sync-recordings.sh >> /home/pi/smartpole/sync.log 2>&1
-0 3 * * * /home/pi/smartpole/cleanup-recordings.sh >> /home/pi/smartpole/cleanup.log 2>&1
+0 */6 * * * /home/pi/smartpole/cleanup-recordings.sh >> /home/pi/smartpole/cleanup.log 2>&1
 ```
 
 ## Crontab ที่ติดตั้งบน DO host

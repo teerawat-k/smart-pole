@@ -1,8 +1,9 @@
 #!/bin/bash
-# Smart Pole — ลบ clip เก่าบน Pi เกิน N วัน (cron daily 3am)
-# Default: 3 วัน (กัน buffer สูญหายระหว่าง network outage ไปยัง DO)
+# Smart Pole — ลบ clip เก่าบน Pi เกิน N ชั่วโมง (cron ทุก 6 ชม.)
+# Default: 36 ชั่วโมง — จำกัดพื้นที่ SD card; buffer พอสำหรับ network outage ไปยัง DO
+# Override: SMARTPOLE_PI_RETENTION_HOURS
 
-RETENTION_DAYS=${SMARTPOLE_PI_RETENTION_DAYS:-3}
+RETENTION_HOURS=${SMARTPOLE_PI_RETENTION_HOURS:-36}
 RECORD_BASE="/home/pi/smartpole/recordings"
 
 if [ ! -d "$RECORD_BASE" ]; then
@@ -10,12 +11,13 @@ if [ ! -d "$RECORD_BASE" ]; then
   exit 0
 fi
 
-# ลบไฟล์เก่า
-DELETED=$(find "$RECORD_BASE" -name "*.mp4" -type f -mtime +"$RETENTION_DAYS" -print -delete | wc -l)
-echo "[$(date -Is)] deleted $DELETED file(s) older than ${RETENTION_DAYS} days"
+# ลบไฟล์เก่า (find ใช้หน่วยนาที — 36h = 2160 min)
+RETENTION_MIN=$(( RETENTION_HOURS * 60 ))
+DELETED=$(find "$RECORD_BASE" -name "*.mp4" -type f -mmin +"$RETENTION_MIN" -print -delete | wc -l)
+echo "[$(date -Is)] deleted $DELETED file(s) older than ${RETENTION_HOURS}h"
 
-# ลบ folder ว่าง (depth >=2 เพื่อไม่ลบ pole-XX root folder)
-find "$RECORD_BASE" -mindepth 2 -type d -empty -mtime +1 -delete 2>/dev/null
+# ลบ folder ว่าง (depth >=2 เพื่อไม่ลบ pole-XX root folder; เก่ากว่า 1 วัน)
+find "$RECORD_BASE" -mindepth 2 -type d -empty -mmin +1440 -delete 2>/dev/null
 
 # แสดง disk usage ปัจจุบัน
 echo "[$(date -Is)] current usage:"

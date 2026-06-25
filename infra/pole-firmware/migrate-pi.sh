@@ -210,7 +210,7 @@ $SUDO_CMD systemctl enable --now smartpole smartpole-stream smartpole-record
 (crontab -l 2>/dev/null | grep -v smartpole > /tmp/cron-new || true)
 cat >> /tmp/cron-new <<'CRON'
 */5 * * * * /home/$PI_SSH_USER/smartpole/sync-recordings.sh >> /home/$PI_SSH_USER/smartpole/sync.log 2>&1
-0 3 * * * /home/$PI_SSH_USER/smartpole/cleanup-recordings.sh >> /home/$PI_SSH_USER/smartpole/cleanup.log 2>&1
+0 */6 * * * /home/$PI_SSH_USER/smartpole/cleanup-recordings.sh >> /home/$PI_SSH_USER/smartpole/cleanup.log 2>&1
 CRON
 crontab /tmp/cron-new
 rm /tmp/cron-new
