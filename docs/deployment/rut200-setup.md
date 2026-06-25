@@ -10,15 +10,13 @@
 RUT200 ทำหน้าที่เป็น **gateway 4G** ของเสา — อุปกรณ์ในเสา (Pi + กล้อง) ต่อเข้า LAN ของ RUT200 แล้วออกเน็ตผ่าน SIM
 
 ```
-                    ┌──────────── เสา (pole) ────────────┐
-   กล้อง CCTV ──┐                                          
-  192.168.1.108 │                                          
-                ├─[switch]─ LAN ─ RUT200 ─ SIM ─((4G))─ True ─ Internet ─ DO host
-   Raspberry Pi ┘                  │                                      152.42.242.162
-   (eth0, DHCP)                    └ WAN = Mobile (4G)
+   กล้อง CCTV  ── LAN1 ┐
+  192.168.1.108         ├─ RUT200 ─ SIM ─((4G))─ True ─ Internet ─ DO host
+   Raspberry Pi ── LAN2 ┘   WAN(eth) → reassign เป็น LAN        152.42.242.162
+   (eth0)
 ```
 
-> **สำคัญ:** RUT200 มี Ethernet แค่ **2 พอร์ต** (1 LAN + 1 WAN) → ต่อทั้ง Pi และกล้องพร้อมกันต้องใช้ **switch** คั่นที่พอร์ต LAN
+> **พอร์ต:** RUT200 มี Ethernet 2 พอร์ต — default **1 WAN + 1 LAN** แต่เน็ตมาจาก **SIM** → พอร์ต WAN ว่าง → **reassign WAN เป็น LAN** (ดูขั้นที่ 4) ได้ **2 LAN พอดี** → ต่อ **กล้อง + Pi โดยตรง ไม่ต้องใช้ switch** (switch จำเป็นเฉพาะถ้าต่อ > 2 อุปกรณ์)
 
 | Data flow | ทิศทาง | ผ่าน 4G |
 |---|---|---|
@@ -91,16 +89,27 @@ curl -s ifconfig.me; echo   # public IP ที่โลกเห็น
 - **ไม่ตรงกัน** → อยู่หลัง **CGNAT** (เกือบแน่นอน) → SSH เข้าเสาตรงไม่ได้ ต้องใช้ VPN/RMS (pending)
 - ตรงกัน → มี public IP (กรณีพิเศษ/แพ็กเกจ static IP)
 
-### ขั้นที่ 4 — ตั้งค่า LAN (ให้เข้ากับกล้อง + Pi)
+### ขั้นที่ 4 — ตั้งค่า LAN + ใช้พอร์ต WAN เป็น LAN ที่ 2
 
-ไปที่ **Network → LAN**
+**4.1 LAN subnet** — ไปที่ **Network → LAN**
 
-> 🔴 **ห้ามเปลี่ยน subnet** — กล้องตั้ง IP คงที่ `192.168.1.108` และ firmware เสาอ้างถึง IP นี้ → LAN ต้องคง **`192.168.1.0/24`** (RUT200 IP `192.168.1.1`)
+- LAN default = `192.168.1.1/24` **ตรงกับกล้องอยู่แล้ว → คงไว้ ไม่ต้องแก้**
+  (อย่าเปลี่ยนเป็น subnet อื่น เพราะกล้อง static `192.168.1.108` + firmware เสาอ้างถึง IP นี้)
+- **DHCP:** เปิด — กำหนด range เลี่ยง `.108` (กล้อง) เช่น `192.168.1.120–192.168.1.200`
+- **Pi:** ตั้ง **Static lease (DHCP reservation)** ผูก MAC ของ Pi → IP คงที่ (เช่น `192.168.1.10`)
 
-1. **IP address:** `192.168.1.1` / mask `255.255.255.0` (ค่า default — คงไว้)
-2. **DHCP:** เปิด — แต่กำหนด range ให้เลี่ยง `.108` (กล้อง) เช่น range `192.168.1.120–192.168.1.200`
-3. **Pi:** แนะนำตั้ง **Static lease (DHCP reservation)** ผูก MAC ของ Pi → IP คงที่ (เช่น `192.168.1.10`) เพื่อให้ที่อยู่ Pi คาดเดาได้
-4. ต่อ **switch** ที่พอร์ต LAN → เสียบ Pi + กล้องเข้า switch
+**4.2 Reassign พอร์ต WAN → LAN** (เน็ตมาจาก SIM → พอร์ต WAN ว่าง → ใช้เป็น LAN ที่ 2)
+
+ไปที่ **Network → Interfaces / Ports** (อ้างอิง wiki ["Setting up WAN as LAN"](https://wiki.teltonika-networks.com/view/Setting_up_WAN_as_LAN)):
+
+1. แก้ interface **WAN** → Physical Settings → เอา physical port ออก (เลือก *No interface*)
+2. แก้ **WAN6** เช่นเดียวกัน
+3. แก้ interface **LAN** → Physical Settings → **เพิ่มพอร์ต `wan`** เข้า bridge
+
+→ ได้ **2 LAN port** → เสียบ **กล้อง + Pi โดยตรง ไม่ต้องใช้ switch**
+
+> ⚠️ ทำหลัง Mobile/4G ใช้งานได้แล้ว (ขั้นที่ 2-3) เพราะหลัง reassign จะไม่มี wired WAN — internet ต้องมาจาก SIM เท่านั้น
+> 💡 switch จำเป็นเฉพาะถ้าต่อ **> 2 อุปกรณ์** (เช่น เพิ่มกล้อง/NVR ภายหลัง)
 
 ### ขั้นที่ 5 — WiFi (ความปลอดภัย field device)
 
@@ -165,7 +174,7 @@ curl -s ifconfig.me; echo   # public IP ที่โลกเห็น
 |---|---|
 | Mobile ไม่ Connected | APN ผิด (เช็คกับผู้ให้บริการ SIM) / SIM PIN / สัญญาณอ่อน / SIM ไม่ activate |
 | สัญญาณอ่อน (RSRP < -110) | ขยับ/เพิ่มเสาอากาศ LTE, หาตำแหน่งสัญญาณดี |
-| Pi/กล้อง ไม่ได้ IP | switch ต่อถูกพอร์ต LAN ไหม, DHCP เปิดไหม |
+| Pi/กล้อง ไม่ได้ IP | reassign WAN→LAN แล้วหรือยัง (ขั้น 4.2), DHCP เปิดไหม, เสียบถูกพอร์ต LAN ไหม |
 | กล้อง ping ไม่เจอ | กล้องยัง `192.168.1.108`? subnet ตรงไหม |
 | ออกเน็ตไม่ได้แต่ Mobile Connected | APN/PDP type, ตรวจ data limit ว่าชนหรือยัง |
 | SSH เข้าเสาจากนอกไม่ได้ | ปกติ (CGNAT) — ต้องผ่าน VPN/RMS (pending) |
