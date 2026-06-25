@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-06-26 · Park: VPN remote-maintenance + data-budget Step 2 (ทำ RUT200 config ก่อน)
+
+- **สถานการณ์:** วิเคราะห์ 2 เรื่องของ phase 4G เสร็จแล้ว แต่ priority ตอนนี้คือ initial setup/config RUT200 ให้ใช้งานได้ก่อน
+- **ตัดสินใจ:** **park ทั้ง 2 เรื่องชั่วคราว** เก็บข้อสรุปการวิเคราะห์ไว้ resume ทีหลัง:
+  1. **VPN remote maintenance** — เอนเอียง **WireGuard self-host + segmentation เข้ม** (per-peer firewall ให้เสาเข้าได้แค่ bastion, hub แยกจาก production host, key revocable ต่อเสา). ปลอดภัยพอ**เฉพาะถ้าทำ segmentation ได้**; ทางที่ดีสุด = **on-demand tunnel trigger ผ่าน MQTT** (exposure ต่ำสุด). harden ไม่ได้ → **ไม่ทำ** ใช้ maintenance on-site แทน. หลักการ: **field device = semi-trusted → เสาโดน compromise แล้วต้องลามเข้า production ไม่ได้**
+  2. **Data budget Step 2** — Step 1 (cap 15fps/150k) ทำแล้ว (worst-case ~97GB). Step 2 = **on-demand live + record-sync (D/E) ผ่าน MQTT downlink** — pending
+- **เหตุผล:** RUT200 network/SIM ต้องใช้งานได้ก่อน ทั้ง 2 เรื่องค่อยตามมา
+- **ผลที่ตามมา:** ทั้งคู่ผูกกับ **MQTT control plane (level 3, P2-4)** → ทำพร้อมกันได้เมื่อถึงเวลา; provision เสาทำบน **public IP ก่อนติดตั้ง** (VPN ไม่เกี่ยวกับ provisioning); ดูรายละเอียดวิเคราะห์ใน entry `2026-06-25 · 4G/CGNAT`
+
+---
+
 ## 2026-06-25 · 4G/CGNAT — เสาบน cellular ต่อ outbound ได้ แต่ inbound ไม่ได้
 
 - **สถานการณ์:** phase ถัดไปเสาย้ายจาก local network → 4G LTE (Teltonika RUT200 + True SIM 100GB/เดือน). SIM มือถือเกือบทั้งหมดอยู่หลัง **CGNAT** → เสาได้ private IP, ต่อ **ออก** ได้ แต่ไม่มีใครต่อ **เข้า** หาเสาได้
