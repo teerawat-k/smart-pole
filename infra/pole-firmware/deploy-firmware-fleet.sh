@@ -9,6 +9,10 @@
 #    (มี POLE_NAME + MQTT/RTSP creds) → ใช้ provision-pi.sh / migrate-pi.sh เท่านั้น
 #    push ตรงจะทับ credential ของเสา
 #
+# 🔴 SSH-based → ใช้ได้เฉพาะ local LAN หรือผ่าน VPN เท่านั้น
+#    เสาบน 4G อยู่หลัง CGNAT → SSH เข้าตรงไม่ได้ → ต้องใช้ VPN/RUT200 RMS
+#    หรือย้าย management ไป MQTT downlink (ดู docs/decision-log.md 2026-06-25 · 4G/CGNAT)
+#
 # Inventory file (default: fleet.txt ข้างสคริปต์ — 1 เสา/บรรทัด, '#' = comment):
 #   <pi-host>            เช่น  pole-001
 #   <pi-host> <pole>     เช่น  pole-001  pole-01      (มี pole → จะ patch POLE_NAME ให้)

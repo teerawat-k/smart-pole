@@ -56,8 +56,9 @@ cp fleet.example.txt fleet.txt        # ใส่เสาจริง (fleet.tx
 - เสา offline ถูกข้าม (ไม่ล้มทั้ง fleet) → retry รอบหน้า, สรุปผล ok/skipped/failed ท้ายรัน
 - **⚠️ ห้าม fleet-push** `main.py` / `stream-rtmp.sh` / `record-mp4.sh` / `sync-recordings.sh` — ไฟล์เหล่านี้ถูก patch credential ต่อเสา (MQTT/RTSP) → ใช้ `provision-pi.sh` / `migrate-pi.sh` เท่านั้น
 - `--restart` ต้องตั้ง NOPASSWD sudo บน Pi (services เป็น system unit)
+- **🔴 SSH-based → ใช้ได้เฉพาะ local LAN / VPN** — เสาบน 4G อยู่หลัง CGNAT (SSH เข้าตรงไม่ได้) → ต้องใช้ VPN/RUT200 RMS หรือ MQTT downlink (level 3)
 
-> roadmap ขยาย (versioning + MQTT control plane) ดู [decision-log](../../docs/decision-log.md) `2026-06-25 · Fleet firmware management`
+> roadmap ขยาย (versioning + MQTT control plane) + ข้อจำกัด CGNAT ดู [decision-log](../../docs/decision-log.md) `2026-06-25`
 
 ## Crontab ที่ติดตั้งบน Pi
 

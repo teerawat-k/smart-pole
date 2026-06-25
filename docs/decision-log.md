@@ -4,6 +4,22 @@
 
 ---
 
+## 2026-06-25 · 4G/CGNAT — เสาบน cellular ต่อ outbound ได้ แต่ inbound ไม่ได้
+
+- **สถานการณ์:** phase ถัดไปเสาย้ายจาก local network → 4G LTE (Teltonika RUT200 + True SIM 100GB/เดือน). SIM มือถือเกือบทั้งหมดอยู่หลัง **CGNAT** → เสาได้ private IP, ต่อ **ออก** ได้ แต่ไม่มีใครต่อ **เข้า** หาเสาได้
+- **ตัดสินใจ:**
+  1. **Data flow ไม่ต้องแก้** — MQTT/RTMP/rsync ทั้งหมดเป็น outbound จากเสา → ใช้ได้บน 4G (กล้อง RTSP อยู่ LAN หลัง RUT200 ไม่วิ่ง 4G)
+  2. **Management ต้องเปลี่ยน** — SSH เข้าเสา, `deploy-firmware-fleet.sh` (SSH-based), provision/migrate remote → ใช้บน 4G ไม่ได้ → ต้องผ่าน **VPN (WireGuard/OpenVPN) / RUT200 RMS / reverse SSH tunnel** หรือย้ายไป **MQTT downlink**
+  3. **Scenario E (clip-on-request)** ต้องเป็น backend → MQTT → เสา rsync clip **ออก** (ห้าม host pull เข้าเสา)
+- **เหตุผล:** CGNAT บล็อก inbound เป็นข้อจำกัดของ cellular ทั่วไป แก้ฝั่งเราไม่ได้ (นอกจากซื้อ public/static-IP SIM) → ต้องออกแบบให้ทุกอย่าง "เสาเริ่มต่อออก" หรือ "สั่งผ่าน MQTT downlink"
+- **ผลที่ตามมา:**
+  - `deploy-firmware-fleet.sh` (SSH-based) ใช้ได้เฉพาะ **local LAN / ผ่าน VPN** — mark ใน header + [production-readiness.md](./production-readiness.md) `P2-4`
+  - **ตอกย้ำว่า MQTT control plane (level 3) จำเป็น ไม่ใช่ optional** สำหรับ cellular — เป็นทางเดียวที่สั่งงานเสาผ่าน CGNAT ได้
+  - ต้องเลือก remote-management ก่อน deploy 4G: **RUT200 RMS** หรือ **WireGuard/OpenVPN** (RUT200 รองรับ)
+  - ตรวจจริงเมื่อได้ SIM: เทียบ WAN IP บน RUT200 กับ `curl ifconfig.me` — ไม่ตรง = หลัง CGNAT (เกือบแน่นอน)
+
+---
+
 ## 2026-06-25 · Pole status semantics + Fleet firmware management
 
 - **สถานการณ์:**

@@ -140,6 +140,7 @@
 - **บริบท:** ดู [decision-log.md](./decision-log.md) entry `2026-06-25 · Pole status semantics + Fleet firmware management`
 - **ทำแล้ว (level 1):** ✅ `infra/pole-firmware/deploy-firmware-fleet.sh` — push ไฟล์ pole-agnostic (เช่น `cleanup-recordings.sh`) ไปทุกเสาใน `fleet.txt` พร้อมกัน + per-pole error isolation
 - **ข้อจำกัด level 1:** push ไฟล์ที่มี per-pole credential ไม่ได้ (`main.py`/stream/record/sync ถูก patch MQTT/RTSP ต่อเสา) + ยังต้อง maintain `fleet.txt` เอง (Pi SSH host ไม่อยู่ใน DB)
+- **🔴 ข้อจำกัด cellular (CGNAT):** `deploy-firmware-fleet.sh` เป็น SSH-based → **ใช้บน 4G ไม่ได้** (เสาอยู่หลัง CGNAT, inbound ถูกบล็อก) → ใช้ได้เฉพาะ local LAN หรือผ่าน VPN/RMS. บน 4G ต้องย้าย management ไป **MQTT downlink (level 3)** หรือวาง **VPN (WireGuard/OpenVPN) / RUT200 RMS** — ดู [decision-log.md](./decision-log.md) `2026-06-25 · 4G/CGNAT`
 - **ค้าง (level 2-3):**
   1. **Firmware versioning** — เพิ่ม `FIRMWARE_VERSION` ใน `main.py` → ส่งใน `/health` → backend เก็บ `Pole.firmwareVersion` → dashboard เห็น version drift (เสาไหน update ค้าง)
   2. **MQTT control plane** — `smartpole/<pole>/cmd` (downlink) + `smartpole/<pole>/config` (retained) → backend push config/update ผ่าน MQTT, Pi agent apply + ack. รองรับเสา offline (retained รอจนกลับมา) + ไม่ต้อง SSH fan-out
