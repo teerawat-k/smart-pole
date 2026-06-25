@@ -17,6 +17,7 @@
 | `sensor.py` | PM2510TH-OD sensor driver (Modbus RTU) | `/home/pi/smartpole/sensor.py` |
 | `provision-pi.sh` | สคริปต์ **เพิ่ม pole ใหม่** (สร้าง DB + ลง Pi) | (รันจาก dev machine) |
 | `migrate-pi.sh` | สคริปต์ **สลับ Pi hardware** ของเสาที่มีอยู่แล้ว | (รันจาก dev machine) |
+| `deploy-firmware-fleet.sh` | **push firmware pole-agnostic ไปทุกเสา** ใน `fleet.txt` พร้อมกัน | (รันจาก dev machine) |
 
 ## DVR Architecture
 
@@ -41,6 +42,22 @@ Retention:
 ffmpeg `-f tee` กับ FLV/RTMP slave มีปัญหา timing ตอน startup — RTMP fail ครั้งแรก, `onfail=ignore` ทำให้ live ตาย (recording ยังทำงาน)
 แยก 2 process: simple + reliable + failure isolated
 Cost: 2× transcode CPU = ~110% ของ 1 core (Pi 4 มี 4 cores พอเหลือ) + 2× RTSP pull จากกล้อง (Dahua รองรับหลาย client)
+
+## Fleet deploy — push firmware หลายเสาพร้อมกัน
+
+อัปเดตไฟล์ firmware ที่ **pole-agnostic** (ไม่มี per-pole credential) ไปทุกเสาในครั้งเดียว
+
+```bash
+cp fleet.example.txt fleet.txt        # ใส่เสาจริง (fleet.txt ถูก gitignore)
+./deploy-firmware-fleet.sh --files "cleanup-recordings.sh"
+./deploy-firmware-fleet.sh --files "cleanup-recordings.sh" --restart "smartpole-record" --dry-run
+```
+
+- เสา offline ถูกข้าม (ไม่ล้มทั้ง fleet) → retry รอบหน้า, สรุปผล ok/skipped/failed ท้ายรัน
+- **⚠️ ห้าม fleet-push** `main.py` / `stream-rtmp.sh` / `record-mp4.sh` / `sync-recordings.sh` — ไฟล์เหล่านี้ถูก patch credential ต่อเสา (MQTT/RTSP) → ใช้ `provision-pi.sh` / `migrate-pi.sh` เท่านั้น
+- `--restart` ต้องตั้ง NOPASSWD sudo บน Pi (services เป็น system unit)
+
+> roadmap ขยาย (versioning + MQTT control plane) ดู [decision-log](../../docs/decision-log.md) `2026-06-25 · Fleet firmware management`
 
 ## Crontab ที่ติดตั้งบน Pi
 

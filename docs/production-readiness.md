@@ -135,6 +135,19 @@
 
 ## 🟡 P2 — Nice to have
 
+### P2-4 · Fleet firmware/config management (level 2-3)
+
+- **บริบท:** ดู [decision-log.md](./decision-log.md) entry `2026-06-25 · Pole status semantics + Fleet firmware management`
+- **ทำแล้ว (level 1):** ✅ `infra/pole-firmware/deploy-firmware-fleet.sh` — push ไฟล์ pole-agnostic (เช่น `cleanup-recordings.sh`) ไปทุกเสาใน `fleet.txt` พร้อมกัน + per-pole error isolation
+- **ข้อจำกัด level 1:** push ไฟล์ที่มี per-pole credential ไม่ได้ (`main.py`/stream/record/sync ถูก patch MQTT/RTSP ต่อเสา) + ยังต้อง maintain `fleet.txt` เอง (Pi SSH host ไม่อยู่ใน DB)
+- **ค้าง (level 2-3):**
+  1. **Firmware versioning** — เพิ่ม `FIRMWARE_VERSION` ใน `main.py` → ส่งใน `/health` → backend เก็บ `Pole.firmwareVersion` → dashboard เห็น version drift (เสาไหน update ค้าง)
+  2. **MQTT control plane** — `smartpole/<pole>/cmd` (downlink) + `smartpole/<pole>/config` (retained) → backend push config/update ผ่าน MQTT, Pi agent apply + ack. รองรับเสา offline (retained รอจนกลับมา) + ไม่ต้อง SSH fan-out
+  3. **Config แยกจาก code** — retention/offline-threshold/interval ให้ Pi อ่านจาก retained config topic แทน hardcode → เปลี่ยนค่า fleet-wide = publish ค่าเดียว ไม่ต้อง redeploy
+- **Trigger:** ทำ level 2-3 เมื่อจำนวนเสา > ~10 (ตอนนี้ 1 เสา — level 1 พอ)
+- **Estimate:** level 2 ~3-4 ชม. · level 3 ~2-3 วัน (Pi agent + backend control endpoint + ack handling)
+- **Status:** level 1 done · level 2-3 open
+
 ### P2-1 · ฟื้นหน้า Alert UI ใน frontend (ถ้าผู้ใช้ต้องการ)
 
 - **บริบท:** commit `9e40888` ลบหน้า `/alerts` + `useAlerts` hook + `lib/api/alert.ts` ออกจาก frontend, แต่ **backend module ยังทำงานอยู่ครบ**:

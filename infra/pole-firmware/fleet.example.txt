@@ -1,0 +1,14 @@
+# Fleet inventory — ใช้กับ deploy-firmware-fleet.sh (1 เสา/บรรทัด)
+#
+# คัดลอกไฟล์นี้เป็น  fleet.txt  แล้วใส่เสาจริง (fleet.txt ถูก gitignore — มี Pi address)
+#
+# format:  <pi-host>  [pole-name]  [ssh-user]
+#   pi-host    = hostname/IP ที่ ssh เข้าได้ด้วย key (เช่น pole-001 หรือ 192.168.1.50)
+#   pole-name  = (optional) ชื่อเสาใน DB — ใช้ patch POLE_NAME ในไฟล์ที่มีตัวแปรนี้
+#   ssh-user   = (optional, default: pi)
+#
+# '#' = comment, บรรทัดว่างถูกข้าม
+#
+# ตัวอย่าง:
+# pole-001       pole-01
+# 192.168.1.50   pole-02   pi

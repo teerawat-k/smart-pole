@@ -4,6 +4,24 @@
 
 ---
 
+## 2026-06-25 · Pole status semantics + Fleet firmware management
+
+- **สถานการณ์:**
+  1. เหตุการณ์จริง: sensor (Modbus) ของ pole-001 power หลุด ~58 นาที — Pi ยังส่ง `/health` (outcome=timeout) แต่หยุดส่ง `/sensor`. เดิม backend อัปเดต `lastSeenAt` เฉพาะตอนได้ `/sensor` → เสาถูก mark `offline` ทั้งที่ live stream + recording ยังทำงาน 100% (เสายัง reachable แค่ sensor พัง)
+  2. การแก้ retention SD card (36 ชม.) ต้อง `scp` + แก้ crontab รายเสาด้วยมือ — 1 เสายังโอเค แต่ไม่ scale + เสี่ยง config drift
+- **ตัดสินใจ:**
+  1. **นิยาม offline ใหม่:** เสา `offline` = ติดต่อไม่ได้เลย (ไม่มีทั้ง `/sensor` และ `/health`). ให้ `/health` ต่ออายุ `lastSeenAt` ด้วย ผ่าน helper กลาง `markPoleSeen()` — `lastSeenAt` = "ติดต่อล่าสุด", `latestReadingAt` = "อ่าน sensor สำเร็จล่าสุด" (แยกกัน)
+  2. **Fleet firmware (level 1):** สร้าง `deploy-firmware-fleet.sh` — loop `scp`+`ssh` ทุกเสาใน `fleet.txt`, per-pole error isolation, push เฉพาะไฟล์ pole-agnostic (default `cleanup-recordings.sh`)
+- **เหตุผล:**
+  1. `offline` ต้องสะท้อน "ติดต่อเสาไม่ได้" จริง ไม่ใช่ "sensor อ่านไม่ได้" — 2 เคสนี้ ops ตอบสนองต่างกัน (เปลี่ยน sensor vs ไปดูเสา/เน็ต). heartbeat-scan logic เดิม (`lastSeenAt < cutoff`) ถูกอยู่แล้ว — แค่ feed ข้อมูลให้ถูก
+  2. ไฟล์ firmware ส่วนใหญ่ (`main.py`/stream/record/sync) ถูก patch credential ต่อเสา → fleet-push ตรงจะ clobber → level 1 จำกัดเฉพาะไฟล์ pole-agnostic ก่อน (ปลอดภัย, แก้ pain เฉพาะหน้า)
+- **ผลที่ตามมา:**
+  - commit `6e31d89` (mqtt status logic + test), `7bf25de` (retention 36h), + fleet script
+  - **Roadmap fleet (ยังไม่ทำ):** level 2 = firmware versioning (`FIRMWARE_VERSION` ใน `/health` → ตรวจ drift บน dashboard), level 3 = MQTT control plane (`smartpole/<pole>/cmd` + `config` retained → push config/update ผ่าน MQTT รองรับเสา offline, ไม่ต้อง SSH fan-out). retention/threshold ควรกลายเป็น "config push ค่าเดียว" แทน redeploy เมื่อทำ level 3 — ดู [production-readiness.md](./production-readiness.md) `P2-4`
+  - หลัก design: แยก **code** (versioned + pull/trigger) ออกจาก **config** (push ผ่าน MQTT retained)
+
+---
+
 ## 2026-06-17 · P0 Security hardening — production-grade
 
 - **สถานการณ์:** Pi 5 migration เสร็จ + ระบบเริ่ม stable → ถึงเวลา harden ก่อน pilot launch จริง บางส่วนยังเป็น dev default (Mosquitto allow_anonymous, JWT secret อาจเป็น dev placeholder, Pi SSH password auth เปิด, ไม่มี global API rate limit)
