@@ -2,6 +2,7 @@
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { prisma } from "@/plugins/prisma";
 import { handleSensorMessage } from "./handlers/handle-sensor";
+import { handleHealthMessage } from "./handlers/handle-health";
 import { hashPassword } from "@/common/utils/password";
 
 const TEST_POLE_NAME = `mqtt-itest-${Date.now()}`;
@@ -114,5 +115,37 @@ describe("MQTT integration — sensor handler", () => {
     });
     const count = await prisma.sensorReading.count({ where: { poleId: testPoleId } });
     expect(count).toBe(0);
+  });
+});
+
+describe("MQTT integration — health handler", () => {
+  test("ส่ง health outcome=timeout → ต่ออายุ lastSeenAt + สถานะ online แม้ sensor อ่านค่าไม่ได้", async () => {
+    // จำลองเสาที่ถูก mark offline ไว้ก่อน
+    await prisma.pole.update({
+      where: { id: testPoleId },
+      data: { poleStatus: "offline", lastSeenAt: null },
+    });
+
+    const now = Date.now();
+    await handleHealthMessage(TEST_POLE_NAME, {
+      timestamp: now,
+      outcome: "timeout",
+      error: "no answer",
+    });
+
+    const pole = await prisma.pole.findUnique({ where: { id: testPoleId } });
+    expect(pole?.poleStatus).toBe("online");
+    expect(pole?.lastSeenAt).toBe(BigInt(now));
+    // health ไม่แตะค่า sensor ล่าสุด (lastSeenAt = ติดต่อล่าสุด, latestReadingAt = อ่าน sensor สำเร็จล่าสุด)
+    expect(pole?.latestReadingAt).toBeNull();
+  });
+
+  test("ส่ง health จากเสาที่ไม่มีในระบบ → ไม่ throw", async () => {
+    await handleHealthMessage("non-existent-pole", {
+      timestamp: Date.now(),
+      outcome: "ok",
+    });
+    const pole = await prisma.pole.findUnique({ where: { id: testPoleId } });
+    expect(pole?.lastSeenAt).toBeNull();
   });
 });
