@@ -8,6 +8,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_PROJECT_PREFIX: z.string().min(1),
   // SRS HLS base URL — empty = ใช้ /hls relative path
   NEXT_PUBLIC_HLS_BASE: z.string().default(""),
+  // SRS HTTP-FLV base URL — empty = ใช้ /flv relative path
+  NEXT_PUBLIC_FLV_BASE: z.string().default(""),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 

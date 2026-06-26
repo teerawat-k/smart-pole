@@ -7,8 +7,8 @@ import { AppCombobox } from "@/components/layout/app-combobox";
 import { Wifi, WifiOff, Wrench, Antenna, Radio } from "lucide-react";
 import { usePoleLookup } from "@/hooks/api/use-poles";
 import { useSensorLatest } from "@/hooks/api/use-sensors";
-import { HlsPlayer } from "@/components/shared/hls-player";
-import { buildWsUrl, hlsPlaylistUrl } from "@/lib/runtime-url";
+import { LiveVideoPlayer } from "@/components/shared/live-video-player";
+import { buildWsUrl } from "@/lib/runtime-url";
 import type { PoleStatus } from "@/lib/api/pole";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -76,8 +76,8 @@ export default function DashboardPage() {
     [poleLookup.data],
   );
 
-  // ── Live stream URL — เปลี่ยน key เพื่อ remount HlsPlayer เมื่อเปลี่ยนเสา ────
-  const liveStreamUrl = selected?.hasCamera ? hlsPlaylistUrl(selected.poleName) : null;
+  // ── Live: แสดงเมื่อเสามีกล้อง (remount ด้วย key=poleName เมื่อเปลี่ยนเสา) ────
+  const showLive = Boolean(selected?.hasCamera);
 
   return (
     <div className="h-full overflow-y-auto p-4 md:p-6 space-y-4">
@@ -136,7 +136,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Camera live stream */}
-      {selected?.hasCamera && liveStreamUrl && (
+      {showLive && selected && (
         <div className="border rounded-md p-4 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="text-sm font-medium">กล้องสด — {selected.poleName}</div>
@@ -146,9 +146,9 @@ export default function DashboardPage() {
             </Badge>
           </div>
           <div className="bg-black rounded overflow-hidden w-full h-[55vh] min-h-[320px] max-h-[640px]">
-            <HlsPlayer
-              key={liveStreamUrl}
-              src={liveStreamUrl}
+            <LiveVideoPlayer
+              key={selected.poleName}
+              poleName={selected.poleName}
               className="w-full h-full"
             />
           </div>

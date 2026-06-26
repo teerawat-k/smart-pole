@@ -39,12 +39,21 @@ export function buildWsUrl(token: string): string {
 }
 
 /**
- * HLS playlist URL ของเสา
+ * HLS playlist URL ของเสา (fallback player)
  * Default: /hls/live/<pole>.m3u8 (relative, hls.js resolve เอง)
  */
 export function hlsPlaylistUrl(poleName: string): string {
   const base = env.NEXT_PUBLIC_HLS_BASE || "/hls";
   return `${base}/live/${poleName}.m3u8`;
+}
+
+/**
+ * HTTP-FLV stream URL ของเสา (low-latency live ผ่าน mpegts.js)
+ * Default: /flv/live/<pole>.flv (relative — nginx /flv/ → SRS http-flv)
+ */
+export function flvStreamUrl(poleName: string): string {
+  const base = env.NEXT_PUBLIC_FLV_BASE || "/flv";
+  return `${base}/live/${poleName}.flv`;
 }
 
 /**
