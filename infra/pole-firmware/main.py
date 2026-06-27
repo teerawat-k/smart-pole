@@ -70,17 +70,29 @@ sensor = PM2510Sensor(
 )
 
 
-def publish_sensor(seq: int, data: dict) -> None:
+def _publish(topic: str, payload: dict) -> bool:
+    """publish แบบ best-effort — ไม่ throw ตอน MQTT หลุด
+    paho (loop_start + reconnect_delay_set) reconnect เองเบื้องหลัง
+    → กัน main crash ตอนสื่อสารหาย ไม่ต้องพึ่ง systemd restart (seq ไม่ reset)"""
+    try:
+        info = client.publish(topic, json.dumps(payload), qos=1)
+        info.wait_for_publish(timeout=5)
+        return True
+    except (RuntimeError, ValueError, OSError) as e:
+        log.warning(f"publish {topic} ข้าม (MQTT หลุด — reconnect เอง): {e}")
+        return False
+
+
+def publish_sensor(seq: int, data: dict) -> bool:
     payload = {
         "timestamp": int(time.time() * 1000),
         "seq":       seq,
         **data,   # humidity, temperature, pm1, pm25, pm10
     }
-    info = client.publish(SENSOR_TOPIC, json.dumps(payload), qos=1)
-    info.wait_for_publish(timeout=5)
+    return _publish(SENSOR_TOPIC, payload)
 
 
-def publish_health(outcome: str, error: str | None) -> None:
+def publish_health(outcome: str, error: str | None) -> bool:
     """ส่งทุกครั้ง — backend ใช้ count outcome ต่อ pole"""
     payload = {
         "timestamp": int(time.time() * 1000),
@@ -88,8 +100,7 @@ def publish_health(outcome: str, error: str | None) -> None:
     }
     if error:
         payload["error"] = error[:200]   # cap length
-    info = client.publish(HEALTH_TOPIC, json.dumps(payload), qos=1)
-    info.wait_for_publish(timeout=5)
+    return _publish(HEALTH_TOPIC, payload)
 
 
 def tick(seq: int) -> int:
@@ -133,7 +144,10 @@ def main():
         while True:
             now = time.time()
             if now - last_tick >= SENSOR_INTERVAL:
-                seq = tick(seq)
+                try:
+                    seq = tick(seq)
+                except Exception as e:   # safety net — กันรอบเดียวพังทั้ง process
+                    log.error(f"tick error (ข้ามรอบนี้): {e}")
                 last_tick = now
             time.sleep(2)
     except KeyboardInterrupt:
