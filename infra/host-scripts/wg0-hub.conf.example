@@ -1,0 +1,38 @@
+# /etc/wireguard/wg0.conf — Smart Pole VPN hub (ฝั่ง host/HUB)
+#
+# ListenPort เดียว UDP 51820 — WireGuard ไม่ตอบ packet ที่ไม่มี valid key (port "ล่องหน" ต่อ scanner)
+# Segmentation = หัวใจ: เสา join VPN ได้ แต่ "ลามเข้า production ไม่ได้" — บังคับด้วย firewall ด้านล่าง
+#
+# *** สำคัญมาก: host รัน Docker → ต้องใช้ DOCKER-USER chain (ห้ามใช้ FORWARD policy drop) ***
+#     Docker จัดการ iptables เอง (สร้าง ~39 DOCKER chains) — ถ้าตั้ง DROP ใน FORWARD จะพัง container networking
+#     DOCKER-USER ถูกเรียกก่อน DOCKER chains → เป็นจุดเดียวที่ filter traffic เข้า container ได้อย่างปลอดภัย
+#
+# enable boot:  systemctl enable wg-quick@wg0   (hub up ตลอด — ต่างจากเสาที่ on-demand)
+
+[Interface]
+Address    = 10.99.0.1/24
+ListenPort = 51820
+PrivateKey = <HUB_PRIVATE_KEY>      # wg genkey — อยู่บน host เท่านั้น
+
+# ── INPUT: เปิดเฉพาะ WG handshake + กันเสาเข้าถึง service บน host (backend/broker/DB ที่ publish port) ──
+PostUp   = iptables -I INPUT 1 -p udp --dport 51820 -j ACCEPT
+PostUp   = iptables -I INPUT 2 -i %i -j DROP
+# ── DOCKER-USER (forward เข้า container): default chain = RETURN → insert allow เฉพาะ admin↔pole, ที่เหลือ wg0 DROP ──
+#    หมายเหตุ: iptables -I = insert บนสุด → บรรทัดล่างสุดที่ถูก insert ก่อน จะอยู่ "ล่างสุด" ของ chain
+PostUp   = iptables -I DOCKER-USER -i %i -j DROP                                   # (อยู่ล่างสุด) wg0 ที่เหลือ = DROP
+PostUp   = iptables -I DOCKER-USER -i %i -s 10.99.0.2 -d 10.99.0.0/24 -j ACCEPT    # admin → เสา (admin SSH เข้าเสา)
+PostUp   = iptables -I DOCKER-USER -i %i -s 10.99.0.11 -d 10.99.0.2 -j ACCEPT      # เสา → admin (return) เท่านั้น
+PostDown = iptables -D INPUT -p udp --dport 51820 -j ACCEPT
+PostDown = iptables -D INPUT -i %i -j DROP
+PostDown = iptables -D DOCKER-USER -i %i -j DROP
+PostDown = iptables -D DOCKER-USER -i %i -s 10.99.0.2 -d 10.99.0.0/24 -j ACCEPT
+PostDown = iptables -D DOCKER-USER -i %i -s 10.99.0.11 -d 10.99.0.2 -j ACCEPT
+
+[Peer]                               # admin laptop
+PublicKey  = <ADMIN_PUBLIC_KEY>
+AllowedIPs = 10.99.0.2/32            # /32 = anti-spoof + scoping
+
+[Peer]                               # pole-01
+PublicKey  = <POLE01_PUBLIC_KEY>
+AllowedIPs = 10.99.0.11/32           # เพิ่ม [Peer] /32 ต่อเสาใหม่ (pole-02 = 10.99.0.12/32 ...)
+#                                      + เพิ่ม PostUp/PostDown allow คู่ของเสานั้นใน DOCKER-USER ถ้าต้องการ admin↔เสานั้น

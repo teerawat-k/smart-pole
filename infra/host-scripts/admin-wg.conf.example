@@ -1,0 +1,14 @@
+# admin WG config — นำเข้า WireGuard บน laptop ของ admin (Import tunnel from file)
+#
+# ปกติ "ไม่" connect — connect เฉพาะตอนจะ remote เข้าเสา (หลังสั่ง vpn-open ให้เสาเปิด tunnel)
+# gen key:  wg genkey | tee admin.key | wg pubkey  → public ใส่เป็น [Peer] admin บน hub
+
+[Interface]
+Address    = 10.99.0.2/32
+PrivateKey = <ADMIN_PRIVATE_KEY>    # อยู่บน laptop admin เท่านั้น
+
+[Peer]                               # hub
+PublicKey  = <HUB_PUBLIC_KEY>
+Endpoint   = <HUB_PUBLIC_IP>:51820
+AllowedIPs = 10.99.0.0/24            # admin เข้าได้เฉพาะ subnet VPN — ไม่ยึด default route (เน็ตปกติ laptop ไม่กระทบ)
+PersistentKeepalive = 25

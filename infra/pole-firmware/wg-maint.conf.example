@@ -1,0 +1,18 @@
+# /etc/wireguard/wg-maint.conf — Smart Pole on-demand maintenance tunnel (ฝั่งเสา/POLE)
+#
+# คัดลอกเป็น /etc/wireguard/wg-maint.conf บน Pi → ใส่ PrivateKey ของเสา → chmod 600
+# ปกติ "ไม่" up — smartpole-vpn-agent สั่ง up/down ตาม MQTT cmd (on-demand)
+#   ห้าม `systemctl enable wg-quick@wg-maint` (จะ up ตอน boot = ผิดหลัก on-demand)
+#
+# gen key บนเสา:  wg genkey | tee /etc/wireguard/keys/pole-01.key | wg pubkey
+#   → private อยู่บนเสาเท่านั้น · public ส่งให้ hub ใส่เป็น [Peer]
+
+[Interface]
+Address    = 10.99.0.11/24          # /32 ต่อเสา — เปลี่ยนเลขท้ายต่อเสา (pole-02 = .12, pole-03 = .13 ...)
+PrivateKey = <POLE_PRIVATE_KEY>     # wg genkey — อยู่บน Pi เท่านั้น (hub ไม่เคยเห็น)
+
+[Peer]                               # hub
+PublicKey  = <HUB_PUBLIC_KEY>        # public key ของ hub
+Endpoint   = <HUB_PUBLIC_IP>:51820
+AllowedIPs = 10.99.0.0/24            # route แค่ subnet VPN — ไม่ยึด default route (live/MQTT/rsync บน 4G ไม่กระทบ)
+PersistentKeepalive = 25            # คง NAT mapping ระหว่าง session (มีผลเฉพาะตอน tunnel up = data ~0 ยามปกติ)

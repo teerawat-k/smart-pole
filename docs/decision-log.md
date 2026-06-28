@@ -4,6 +4,21 @@
 
 ---
 
+## 2026-06-28 · VPN on-demand WireGuard — implement + verified (+ พบ/แก้ MQTT cred mismatch)
+
+- **สถานการณ์:** สั่งทำ VPN solution ตาม [vpn-solution-design.md](./vpn-solution-design.md) (Phase 1–6) เพื่อ remote เข้าเสาหลัง CGNAT
+- **ตัดสินใจ:** deploy **WireGuard on-demand, hub co-located (DOCKER-USER segmentation), per-pole key**:
+  - **Hub (host):** `wg0` 10.99.0.1/24 UDP 51820 + segmentation ผ่าน `DOCKER-USER` (ไม่ใช่ FORWARD policy — Docker จัดการ iptables เอง) + enable boot
+  - **เสา:** `wg-maint.conf` (on-demand, down by default, AllowedIPs=10.99.0.0/24 ไม่ยึด default route) + `smartpole-vpn-agent` (MQTT `cmd` → `wg-quick up/down` + auto-close timer) + sudoers NOPASSWD เฉพาะ wg-quick
+  - **Admin:** WG client template + `vpn-trigger.py` (รันบน laptop)
+- **เหตุผล:** ตรงหลัก design — เบา (data idle ~0, ไม่กระทบ live 24x7), ปลอดภัย (segmentation + on-demand + per-pole key), ใช้ MQTT control plane เดิม
+- **ผลที่ตามมา:**
+  - **verified:** handshake สำเร็จ · **segmentation พิสูจน์แล้ว** (เสาบน VPN → host/backend = บล็อก 100%) · open/close/auto-close ทำงาน · เส้น 4G ปกติไม่กระทบ · 6 containers healthy
+  - **⚠️ พบ bug ระหว่างทาง:** main.py/agent ใช้ MQTT username `smartpole` แต่ broker (allow_anonymous false) มี user แค่ `pole-01` + `backend-subscriber` + ACL `pattern smartpole/%u/#` → **เสา auth ไม่ผ่าน = sensor/health ไม่เข้า backend** (regression จากตอน deploy main.py fix รอบก่อนทับ cred ที่เคยถูก). **แก้:** เปลี่ยน username → `pole-01` (repo + deployed) + reset password `pole-01` ใน broker passwordfile (bind-mount `ro` → แก้ที่ host path `/var/www/.../passwordfile` + `docker kill -s HUP`) → เสากลับ online (`sensor_reads_total{pole-01}` เพิ่ม)
+  - **ค้าง (production hardening):** Phase 5 (สั่ง vpn-open ผ่าน backend endpoint authenticated + audit) + pole endpoint nft firewall — ทางเลือก (segmentation hub กันชั้นหลักแล้ว)
+
+---
+
 ## 2026-06-26 · Park: VPN remote-maintenance + data-budget Step 2 (ทำ RUT200 config ก่อน)
 
 - **สถานการณ์:** วิเคราะห์ 2 เรื่องของ phase 4G เสร็จแล้ว แต่ priority ตอนนี้คือ initial setup/config RUT200 ให้ใช้งานได้ก่อน

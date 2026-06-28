@@ -1,0 +1,17 @@
+[Unit]
+Description=Smart Pole On-demand WireGuard agent (MQTT-triggered remote maintenance)
+After=network-online.target smartpole.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/pi/smartpole-env/bin/python3 /home/pi/smartpole/smartpole-vpn-agent.py
+WorkingDirectory=/home/pi/smartpole
+User=pi
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
