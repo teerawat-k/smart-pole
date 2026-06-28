@@ -5,6 +5,7 @@ import {
   poleCreateSchema,
   poleUpdateSchema,
   poleMaintenanceSchema,
+  poleVpnSchema,
 } from "./pole.schema";
 import { authGuard } from "@/plugins/jwt";
 import { requirePermission, hasPermission } from "@/common/middleware/require-permission";
@@ -77,6 +78,22 @@ export const poleController = new Elysia({ prefix: "/api/poles" })
     {
       params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
       body: poleMaintenanceSchema,
+      beforeHandle: requirePermission("pole:edit"),
+    },
+  )
+  .post(
+    "/:id/vpn",
+    async ({ params, body, user }) => {
+      const data = await poleService.triggerVpn(params.id, body, user.id);
+      return {
+        success: true,
+        data,
+        message: body.action === "open" ? "ส่งคำสั่งเปิด VPN ไปยังเสาแล้ว" : "ส่งคำสั่งปิด VPN ไปยังเสาแล้ว",
+      };
+    },
+    {
+      params: t.Object({ id: t.Numeric({ minimum: 1 }) }),
+      body: poleVpnSchema,
       beforeHandle: requirePermission("pole:edit"),
     },
   )

@@ -7,7 +7,8 @@ import { updatePole } from "./flow/update";
 import { setMaintenance } from "./flow/set-maintenance";
 import { regenerateMqttCredential } from "./flow/regenerate-credential";
 import { softDeletePole } from "./flow/soft-delete";
-import type { PoleCreateInput, PoleUpdateInput, PoleMaintenanceInput } from "./pole.schema";
+import { triggerVpn } from "./flow/trigger-vpn";
+import type { PoleCreateInput, PoleUpdateInput, PoleMaintenanceInput, PoleVpnInput } from "./pole.schema";
 import type { PoleStatus } from "@prisma/client";
 
 async function getById(id: number) {
@@ -28,6 +29,7 @@ export const poleService = {
   setMaintenance: (id: number, input: PoleMaintenanceInput, requestUserId: number) =>
     setMaintenance(id, input, requestUserId),
   regenerateCredential: (id: number, requestUserId: number) => regenerateMqttCredential(id, requestUserId),
+  triggerVpn: (id: number, input: PoleVpnInput, requestUserId: number) => triggerVpn(id, input, requestUserId),
   delete: (id: number, requestUserId: number) => softDeletePole(id, requestUserId),
 
   // ── Internal: MQTT-driven status updates (เรียกจาก MQTT handler) ──

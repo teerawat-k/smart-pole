@@ -24,6 +24,10 @@ export const AuditAction = {
   REJECT: "REJECT",
   CANCEL: "CANCEL",
   TRANSITION: "TRANSITION",
+
+  // Remote maintenance (on-demand VPN ของเสา) — security-sensitive: ใคร/เมื่อไหร่เปิด remote access
+  VPN_OPEN: "VPN_OPEN",
+  VPN_CLOSE: "VPN_CLOSE",
 } as const;
 
 export type AuditActionValue = (typeof AuditAction)[keyof typeof AuditAction];

@@ -46,6 +46,13 @@ export const poleMaintenanceSchema = t.Object({
   reason: t.Optional(t.String({ maxLength: 500 })),
 });
 
+// on-demand VPN: open = สั่งเสาเปิด tunnel (ttl วินาที, auto-close) · close = ปิดทันที
+export const poleVpnSchema = t.Object({
+  action: t.Union([t.Literal("open"), t.Literal("close")]),
+  ttl: t.Optional(t.Integer({ minimum: 60, maximum: 3600 })),
+});
+
 export type PoleCreateInput = Static<typeof poleCreateSchema>;
 export type PoleUpdateInput = Static<typeof poleUpdateSchema>;
 export type PoleMaintenanceInput = Static<typeof poleMaintenanceSchema>;
+export type PoleVpnInput = Static<typeof poleVpnSchema>;
