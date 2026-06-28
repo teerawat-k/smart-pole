@@ -10,6 +10,13 @@
 [Interface]
 Address    = 10.99.0.11/24          # /32 ต่อเสา — เปลี่ยนเลขท้ายต่อเสา (pole-02 = .12, pole-03 = .13 ...)
 PrivateKey = <POLE_PRIVATE_KEY>     # wg genkey — อยู่บน Pi เท่านั้น (hub ไม่เคยเห็น)
+# endpoint firewall (defense-in-depth): บน wg-maint รับ SSH เฉพาะ admin (10.99.0.2) — ที่เหลือ drop
+# สร้างตอน tunnel up / ลบตอน down (ไม่ค้าง) · ต้องมี nftables บนเสา · %i = wg-maint (wg-quick แทนให้)
+PostUp   = /usr/sbin/nft add table inet wgm
+PostUp   = /usr/sbin/nft "add chain inet wgm input { type filter hook input priority -10 ; policy accept ; }"
+PostUp   = /usr/sbin/nft add rule inet wgm input iifname "%i" tcp dport 22 ip saddr 10.99.0.2 accept
+PostUp   = /usr/sbin/nft add rule inet wgm input iifname "%i" tcp dport 22 drop
+PostDown = /usr/sbin/nft delete table inet wgm
 
 [Peer]                               # hub
 PublicKey  = <HUB_PUBLIC_KEY>        # public key ของ hub
