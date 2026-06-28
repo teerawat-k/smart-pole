@@ -3,7 +3,7 @@
 #
 # ต่างจาก provision-pi.sh:
 #   - skip backend create-pole (เสามีในระบบแล้ว)
-#   - keep MQTT credentials เดิม (smartpole / mqtt_dev_2025) — อยู่ใน main.py จาก repo แล้ว
+#   - keep MQTT credentials เดิม (user=pole-01 / mqtt_dev_2025) — ต้องตรงกับ broker passwordfile + ACL pattern smartpole/%u/#
 #   - รวม Pi initial setup (apt install + venv) สำหรับ fresh OS
 #
 # Workflow:

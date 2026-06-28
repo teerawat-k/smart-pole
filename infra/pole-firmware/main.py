@@ -21,7 +21,7 @@ from sensor import PM2510Sensor, Outcome
 # ── Config ────────────────────────────────────────────
 BROKER     = "152.42.242.162"
 PORT       = 7783
-USERNAME   = "smartpole"
+USERNAME   = "pole-01"          # ต้องตรงกับ user ใน broker passwordfile + ACL pattern smartpole/%u/#
 PASSWORD   = "mqtt_dev_2025"
 POLE_NAME  = "pole-01"
 
