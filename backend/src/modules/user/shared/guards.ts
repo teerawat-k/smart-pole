@@ -23,7 +23,7 @@ export async function assertNotLastActiveAdmin(targetUserId: number): Promise<vo
   const target = await userRepository.findById(targetUserId);
   if (!target || target.role.name !== ADMIN_ROLE_NAME) return;
 
-  const adminRole = await prisma.role.findUnique({ where: { name: ADMIN_ROLE_NAME } });
+  const adminRole = await prisma.role.findFirst({ where: { name: ADMIN_ROLE_NAME, deletedAt: null } });
   if (!adminRole) return;
 
   const activeAdmins = await userRepository.countActiveAdmins(adminRole.id);

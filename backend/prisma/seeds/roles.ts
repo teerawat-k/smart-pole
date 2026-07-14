@@ -17,17 +17,22 @@ const USER_ROLE_PERMISSIONS: { module: string; actions: string[] }[] = [
 ];
 
 export async function seedRoles(): Promise<void> {
+  // name ไม่ใช่ @unique แล้ว (partial unique) → findFirst + create/update guard แทน upsert
   for (const role of DEFAULT_ROLES) {
-    await prisma.role.upsert({
-      where: { name: role.name },
-      update: { description: role.description, isSystem: role.isSystem },
-      create: { ...role }, // createdBy = null (system seed)
-    });
+    const existing = await prisma.role.findFirst({ where: { name: role.name, deletedAt: null } });
+    if (existing) {
+      await prisma.role.update({
+        where: { id: existing.id },
+        data: { description: role.description, isSystem: role.isSystem },
+      });
+    } else {
+      await prisma.role.create({ data: { ...role } }); // createdBy = null (system seed)
+    }
   }
 
   // user role permissions — เฉพาะตอนเริ่มต้น (สถานะ "ยังไม่มี permission ใดๆ")
   // หากเคย seed/แก้ไขใน UI แล้ว → คงค่าเดิม ไม่ overwrite
-  const userRole = await prisma.role.findUnique({ where: { name: "user" } });
+  const userRole = await prisma.role.findFirst({ where: { name: "user", deletedAt: null } });
   if (!userRole) throw new Error("user role missing after seed");
 
   const existingCount = await prisma.rolePermission.count({ where: { roleId: userRole.id } });

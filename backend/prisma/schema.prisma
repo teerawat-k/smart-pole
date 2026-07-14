@@ -54,7 +54,9 @@ model Permission {
 // ─── Role ─────────────────────────────────────────────────────────────────
 model Role {
   id          Int       @id @default(autoincrement())
-  name        String    @unique
+  // unique เฉพาะ row ที่ยังไม่ถูก soft-delete → partial unique index จัดการใน migration
+  // (Prisma ไม่รองรับ partial index ใน schema) ดู migration 2_role_name_partial_unique
+  name        String
   description String?
   isSystem    Boolean   @default(false)
   createdAt   DateTime  @default(now())

@@ -56,7 +56,7 @@ mock.module("@/modules/audit", () => ({
 
 mock.module("@/plugins/prisma", () => ({
   prisma: {
-    role: { findUnique: mock(async () => ({ id: 1, name: "admin" })) },
+    role: { findFirst: mock(async () => ({ id: 1, name: "admin" })) },
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn({}),
   },
 }));

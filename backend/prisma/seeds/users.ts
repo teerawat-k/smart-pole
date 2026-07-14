@@ -13,7 +13,7 @@ const DEFAULT_ADMIN = {
 };
 
 export async function seedUsers(): Promise<void> {
-  const adminRole = await prisma.role.findUnique({ where: { name: "admin" } });
+  const adminRole = await prisma.role.findFirst({ where: { name: "admin", deletedAt: null } });
   if (!adminRole) throw new Error("admin role missing — run seedRoles first");
 
   const passwordHash = await hashPassword(DEFAULT_ADMIN.password);
