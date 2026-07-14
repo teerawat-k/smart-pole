@@ -10,7 +10,7 @@ let testPoleId: number;
 let adminId: number;
 
 beforeAll(async () => {
-  const admin = await prisma.user.findUnique({ where: { username: "admin" }, select: { id: true } });
+  const admin = await prisma.user.findFirst({ where: { username: "admin", deletedAt: null }, select: { id: true } });
   if (!admin) throw new Error("admin user missing — run seed first");
   adminId = admin.id;
 

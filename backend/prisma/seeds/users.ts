@@ -18,27 +18,35 @@ export async function seedUsers(): Promise<void> {
 
   const passwordHash = await hashPassword(DEFAULT_ADMIN.password);
 
-  const user = await prisma.user.upsert({
-    where: { username: DEFAULT_ADMIN.username },
-    update: {
-      password: passwordHash,
-      roleId: adminRole.id,
-      status: "active",
-      loginFailCount: 0,
-      lockedUntil: null,
-      lockedReason: null,
-    },
-    create: {
-      username: DEFAULT_ADMIN.username,
-      email: DEFAULT_ADMIN.email,
-      firstName: DEFAULT_ADMIN.firstName,
-      lastName: DEFAULT_ADMIN.lastName,
-      mobileNo: DEFAULT_ADMIN.mobileNo,
-      password: passwordHash,
-      roleId: adminRole.id,
-      status: "active",
-      // createdBy = null (initial admin)
-    },
+  // username ไม่ใช่ @unique แล้ว (partial unique) → findFirst + create/update guard แทน upsert
+  const existing = await prisma.user.findFirst({
+    where: { username: DEFAULT_ADMIN.username, deletedAt: null },
+    select: { id: true },
   });
+  const user = existing
+    ? await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          password: passwordHash,
+          roleId: adminRole.id,
+          status: "active",
+          loginFailCount: 0,
+          lockedUntil: null,
+          lockedReason: null,
+        },
+      })
+    : await prisma.user.create({
+        data: {
+          username: DEFAULT_ADMIN.username,
+          email: DEFAULT_ADMIN.email,
+          firstName: DEFAULT_ADMIN.firstName,
+          lastName: DEFAULT_ADMIN.lastName,
+          mobileNo: DEFAULT_ADMIN.mobileNo,
+          password: passwordHash,
+          roleId: adminRole.id,
+          status: "active",
+          // createdBy = null (initial admin)
+        },
+      });
   console.log(`✅ Admin upserted: ${user.username} / ${DEFAULT_ADMIN.password} (id=${user.id})`);
 }
