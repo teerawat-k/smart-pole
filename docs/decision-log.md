@@ -4,6 +4,20 @@
 
 ---
 
+## 2026-07-15 · ออกแบบ Sensor Push API (ส่งข้อมูลออกภายนอก) — + บทเรียนจาก "sensor ตายเงียบ"
+
+- **สถานการณ์:** ต้อง push อุณหภูมิ/ความชื้น/PM2.5 ออกไประบบภายนอก · ระหว่างออกแบบเกิดเหตุจริง: **03:33 น. sensor + กล้อง ดับพร้อมกันภายใน 1 นาที** (sensor reading สุดท้าย 20:33:27Z / SRS unpublish 20:34:30Z) แต่ **Pi ยังรอด** — ยังส่ง `/health` ได้ แต่รายงาน `outcome:"timeout"` (NoResponseError: no communication with the instrument) → **ไฟที่จ่ายให้อุปกรณ์รอบข้างหลุด ไม่ใช่แค่กล้องเสีย** (ต่างจากเหตุ 10 ก.ค. ที่กล้องดับแต่ sensor ยังทำงาน) · **กว่าจะรู้ = ~6 ชม.**
+- **ตัดสินใจ (design — ยังไม่ implement):**
+  1. **Outbound push** (เรายิงออก) ไม่ใช่ให้ปลายทาง pull — เขียนใน **backend เดิม (TS/Bun)** ไม่เพิ่ม service/ภาษาใหม่ (RAM host ตึง + event อยู่ที่ backend อยู่แล้ว)
+  2. **1 record ทุก 3 นาที ต่อเสา** — snapshot ค่าล่าสุด ณ tick (ไม่ใช่ค่าเฉลี่ย) · **flat JSON ไม่มี array** เพราะแต่ละเสามี timer แยก
+  3. **anchor จาก online ล่าสุด** — เสา resume → reset นับ 3 นาทีใหม่ (ไม่ยิงรัวชดเชย backlog)
+  4. **ตัด `units` ออกจาก payload** — ปลายทางตกลงหน่วยกันแล้ว → **ล็อกใน spec** (°C / %RH / µg/m³) · เปลี่ยนหน่วยเมื่อไหร่ = ขึ้น `schemaVersion`
+  5. ⭐ **skip เมื่อค่าไม่สด หรือ `seq` ซ้ำ** — **บทเรียนตรงจากเหตุ 15 ก.ค.**: ถ้าไม่มีกฎนี้ ระบบจะส่งค่าเก่า (28°C/87.6%) **ซ้ำทุก 3 นาทีเป็นวัน ๆ** ทั้งที่ sensor ตายไปแล้ว → ปลายทางเข้าใจผิดว่าข้อมูลปกติ · **ให้ปลายทางเห็น "ช่องว่าง" ดีกว่าได้ค่าหลอก**
+- **เหตุผล:** timestamp UTC ISO 8601 ตาม convention (ไม่กำกวม tz) · แยก `measuredAt`/`sentAt` เพราะ retry อาจส่งช้า · `eventId`+`seq` ให้ปลายทาง dedup/ตรวจข้อมูลขาดเองได้ (push เป็น at-least-once)
+- **ผลที่ตามมา:** spec เก็บที่ [integration/sensor-push-api.md](./integration/sensor-push-api.md) · **ค้าง:** URL ปลายทาง + วิธี auth (HMAC/Bearer) · **เปิดประเด็นเร่งด่วนจากเหตุการณ์:** (1) ต้องมี **alert** — รู้ช้า 6 ชม. ทุกครั้ง (2) **smart plug** ที่ไฟกล้อง+sensor — กู้ remote ได้ ไม่ต้องวิ่งหน้างาน (3) ตรวจ **ระบบจ่ายไฟที่เสา** — ทำไมอุปกรณ์รอบข้างดับแต่ Pi ไม่ดับ (ดับซ้ำ 2 ครั้งใน 5 วัน)
+
+---
+
 ## 2026-06-28 · VPN on-demand WireGuard — implement + verified (+ พบ/แก้ MQTT cred mismatch)
 
 - **สถานการณ์:** สั่งทำ VPN solution ตาม [vpn-solution-design.md](./vpn-solution-design.md) (Phase 1–6) เพื่อ remote เข้าเสาหลัง CGNAT
