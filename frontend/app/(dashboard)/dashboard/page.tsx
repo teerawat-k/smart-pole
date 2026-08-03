@@ -87,8 +87,13 @@ export default function DashboardPage() {
           <p className="text-sm text-brand-muted">
             ภาพรวมเสาสัญญาณตามเวลาจริง
             {latestReadingAt && (
-              <span className="ml-2 text-xs text-muted-foreground">
+              <span
+                className={`ml-2 text-xs ${
+                  sensors.data?.sensorFresh === false ? "text-red-500 font-medium" : "text-muted-foreground"
+                }`}
+              >
                 · ข้อมูลล่าสุด {latestReadingAt}
+                {sensors.data?.sensorFresh === false && " (sensor ไม่ส่งข้อมูล)"}
               </span>
             )}
           </p>

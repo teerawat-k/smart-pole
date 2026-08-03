@@ -2,10 +2,11 @@ import { apiClient } from "./client";
 
 export interface SensorLatest {
   latestSeq: string | null;
-  latestPm25: number | null;
+  latestPm25: number | null;         // null = ไม่สด (sensor ไม่ทำงาน) — ไม่แสดงค่าเก่า
   latestTemperature: number | null;
   latestHumidity: number | null;
   latestReadingAt: string | null;
+  sensorFresh: boolean;              // false = ค่าเก่าเกินเกณฑ์ → metric เป็น null
 }
 
 export interface SensorReadingRow {
