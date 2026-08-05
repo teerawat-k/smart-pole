@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Smart Pole — Data Push Integration Guide (Receiver)</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Leelawadee UI', 'Tahoma', 'TH Sarabun New', sans-serif;
+    font-size: 11pt; line-height: 1.55; color: #1a1a2e; margin: 0;
+  }
+  h1,h2,h3 { color: #0f3460; line-height: 1.25; }
+  h1 { font-size: 21pt; margin: 0 0 2px; }
+  h2 { font-size: 14.5pt; border-bottom: 2px solid #0f3460; padding-bottom: 4px; margin: 22px 0 10px; page-break-after: avoid; }
+  h3 { font-size: 12pt; margin: 14px 0 6px; color: #16537e; page-break-after: avoid; }
+  p { margin: 6px 0; }
+  code, pre { font-family: 'Consolas','Courier New',monospace; font-size: 9.5pt; }
+  code { background: #eef1f6; padding: 1px 5px; border-radius: 3px; color: #b02a37; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 11px 13px; border-radius: 6px; overflow-x: auto; line-height: 1.4; page-break-inside: avoid; }
+  pre code { background: none; color: inherit; padding: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10pt; page-break-inside: avoid; }
+  th, td { border: 1px solid #c7d0dd; padding: 5px 8px; text-align: left; vertical-align: top; }
+  th { background: #0f3460; color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: #f4f7fb; }
+  .cover { background: linear-gradient(135deg,#0f3460,#16537e); color: #fff; padding: 30px 28px; border-radius: 10px; margin-bottom: 22px; }
+  .cover h1 { color: #fff; }
+  .cover .sub { font-size: 12.5pt; opacity: .92; margin-top: 6px; }
+  .cover .meta { font-size: 10pt; opacity: .8; margin-top: 14px; }
+  .badge { display: inline-block; background: #e94560; color: #fff; font-size: 9pt; padding: 2px 10px; border-radius: 20px; margin-top: 10px; }
+  .callout { border-left: 4px solid; padding: 8px 12px; margin: 10px 0; border-radius: 0 6px 6px 0; font-size: 10pt; page-break-inside: avoid; }
+  .callout.warn { background: #fff4e5; border-color: #f59e0b; }
+  .callout.info { background: #e7f0fb; border-color: #2563eb; }
+  .callout.crit { background: #fdeaea; border-color: #dc2626; }
+  .step { background: #0f3460; color: #fff; border-radius: 50%; display: inline-block; width: 20px; height: 20px; text-align: center; font-size: 10pt; line-height: 20px; margin-right: 6px; font-weight: 700; }
+  ol { margin: 6px 0 6px 4px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .muted { color: #64748b; font-size: 9.5pt; }
+  .tag { font-size: 8.5pt; padding: 1px 6px; border-radius: 3px; font-weight: 600; }
+  .req { background: #dc2626; color: #fff; }
+  .opt { background: #64748b; color: #fff; }
+  hr { border: none; border-top: 1px solid #dde3ec; margin: 18px 0; }
+  .toc li { margin: 3px 0; }
+  footer { margin-top: 24px; border-top: 1px solid #dde3ec; padding-top: 8px; color: #64748b; font-size: 9pt; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>Smart Pole — Data Push Integration Guide</h1>
+  <div class="sub">คู่มือมาตรฐานสำหรับระบบผู้รับข้อมูล (Receiver) — ทุกรายที่จะเชื่อมต่อ</div>
+  <div class="badge">STANDARD v1.0 · One-way Secure Push</div>
+  <div class="meta">Document version 1.0 · schemaVersion 1.0 · Signature: Ed25519<br>
+  ผู้จัดทำ: Smart Pole Platform · อัปเดต: 2026-08-05</div>
+</div>
+
+<p>เอกสารนี้เป็น <b>มาตรฐานกลาง</b> สำหรับระบบภายนอกที่ต้องการรับข้อมูล sensor (อุณหภูมิ / ความชื้น / PM2.5)
+จากแพลตฟอร์ม Smart Pole แบบ <b>push ทางเดียว (one-way)</b> ผู้เชื่อมต่อทุกรายใช้สเปคชุดเดียวกันนี้เพื่อความปลอดภัยและความสม่ำเสมอ</p>
+
+<h2>สารบัญ</h2>
+<ol class="toc">
+  <li>ภาพรวมและสถาปัตยกรรม (Overview)</li>
+  <li>สิ่งที่ผู้รับต้องเตรียม (Prerequisites)</li>
+  <li>รูปแบบข้อมูล (Payload)</li>
+  <li>HTTP Headers</li>
+  <li>ความปลอดภัยและการตรวจสอบ (Security &amp; Verification) — สำคัญสุด</li>
+  <li>สัญญาการตอบกลับ (HTTP Response Contract)</li>
+  <li>การจัดเก็บและตรวจข้อมูล (Data Handling)</li>
+  <li>การจัดการข้อมูลขาด (Gap Handling)</li>
+  <li>การเสริมความปลอดภัย (Hardening — แนะนำ)</li>
+  <li>สิ่งที่เราส่งมอบ / สิ่งที่ผู้รับไม่ต้องทำ</li>
+  <li>ภาคผนวก: ตัวอย่าง, Pseudo-code, Test cases</li>
+</ol>
+
+<h2>1. ภาพรวมและสถาปัตยกรรม</h2>
+<p>ทิศทางข้อมูลเป็นแบบ <b>ทางเดียว</b> — แพลตฟอร์ม Smart Pole (ผู้ส่ง) เป็นฝ่าย <code>POST</code> ข้อมูลเข้าหา endpoint ของผู้รับ
+ผู้รับ <b>ไม่ต้อง</b> เรียกกลับหรือ poll ข้อมูล</p>
+<pre><code>[ Smart Pole Host ] ──HTTPS POST (signed)──► [ Receiver Endpoint ]
+      ผู้ส่ง                                      ผู้รับ (verify + store)</code></pre>
+<table>
+<tr><th>หัวข้อ</th><th>ค่า</th></tr>
+<tr><td>Method</td><td><code>POST</code> + JSON body</td></tr>
+<tr><td>จังหวะส่ง</td><td>1 record ทุก <b>5 นาที</b> ต่อเสา (snapshot ค่าล่าสุด — ไม่ใช่ค่าเฉลี่ย)</td></tr>
+<tr><td>Authentication</td><td><b>Ed25519 digital signature</b> (asymmetric — ผู้รับใช้ public key เท่านั้น)</td></tr>
+<tr><td>Transport</td><td>HTTPS / TLS 1.2+</td></tr>
+<tr><td>Delivery guarantee</td><td>At-least-once + idempotency (<code>eventId</code>)</td></tr>
+</table>
+
+<h2>2. สิ่งที่ผู้รับต้องเตรียม (Prerequisites)</h2>
+<ol>
+  <li><span class="tag req">ต้องมี</span> <b>HTTPS endpoint</b> + TLS certificate ที่ valid (TLS 1.2 ขึ้นไป)</li>
+  <li><span class="tag req">ต้องมี</span> รับจากผู้ส่ง 4 อย่าง: <b>Public key (Ed25519)</b>, <b>Key-Id</b>, เอกสารสเปคนี้, ตัวอย่าง signed request</li>
+  <li><span class="tag req">ต้องมี</span> Storage 2 ชุด: (ก) ตารางเก็บข้อมูล sensor  (ข) ตาราง/cache เก็บ <code>eventId</code> ที่รับแล้ว (สำหรับ dedup)</li>
+  <li><span class="tag req">ต้องมี</span> ตกลงร่วมกัน: endpoint path, หน่วยวัด, interval, Key-Id ปัจจุบัน</li>
+</ol>
+
+<h2>3. รูปแบบข้อมูล (Payload)</h2>
+<pre><code>{
+  "schemaVersion": "1.0",
+  "source": "smart-pole",
+  "eventId": "9f1c2b7e-4d3a-4b6e-9c11-8a5e2f0d7b34",
+  "sentAt": "2026-08-05T02:35:00.000Z",
+  "poleName": "pole-01",
+  "measuredAt": "2026-08-05T02:34:12.123Z",
+  "seq": 12345,
+  "metrics": {
+    "temperature": 28.00,
+    "humidity": 87.60,
+    "pm25": 13.00
+  }
+}</code></pre>
+<table>
+<tr><th>Field</th><th>Type</th><th>รูปแบบ / หมายเหตุ</th></tr>
+<tr><td><code>schemaVersion</code></td><td>string</td><td>เวอร์ชันโครงสร้าง (ปัจจุบัน <code>"1.0"</code>)</td></tr>
+<tr><td><code>source</code></td><td>string</td><td>ระบบต้นทาง <code>"smart-pole"</code></td></tr>
+<tr><td><code>eventId</code></td><td>string</td><td>UUID v4 — ใช้ dedup</td></tr>
+<tr><td><code>sentAt</code></td><td>string</td><td>UTC ISO 8601 — เวลาที่ส่ง</td></tr>
+<tr><td><code>poleName</code></td><td>string</td><td>รหัสเสา</td></tr>
+<tr><td><code>measuredAt</code></td><td>string</td><td>UTC ISO 8601 — <b>เวลาที่วัดจริง</b> (ใช้เป็นเวลาของข้อมูล)</td></tr>
+<tr><td><code>seq</code></td><td>number</td><td>ลำดับจาก firmware — ใช้ตรวจข้อมูลซ้ำ/ขาด</td></tr>
+<tr><td><code>metrics.temperature</code></td><td>number \| null</td><td>2 ทศนิยม</td></tr>
+<tr><td><code>metrics.humidity</code></td><td>number \| null</td><td>2 ทศนิยม</td></tr>
+<tr><td><code>metrics.pm25</code></td><td>number \| null</td><td>2 ทศนิยม</td></tr>
+</table>
+<div class="callout info"><b>หน่วยวัด (ล็อกในสเปค — ไม่อยู่ใน payload):</b>
+temperature = <b>°C</b> · humidity = <b>%RH</b> · pm25 = <b>µg/m³</b><br>
+metrics แต่ละตัวเป็น <code>null</code> ได้ (กรณี sensor อ่านได้บางค่า) — ผู้รับต้องยอมรับ null</div>
+
+<h2>4. HTTP Headers</h2>
+<pre><code>POST &lt;endpoint&gt; HTTP/1.1
+Content-Type: application/json
+X-SmartPole-Key-Id:     spole-2026
+X-SmartPole-Timestamp:  1785807300
+X-SmartPole-Signature:  ed25519=&lt;base64 signature&gt;
+X-SmartPole-Event-Id:   9f1c2b7e-4d3a-4b6e-9c11-8a5e2f0d7b34</code></pre>
+<table>
+<tr><th>Header</th><th>ความหมาย</th></tr>
+<tr><td><code>X-SmartPole-Key-Id</code></td><td>ระบุว่าใช้ public key ตัวไหน verify (รองรับการหมุน key)</td></tr>
+<tr><td><code>X-SmartPole-Timestamp</code></td><td>Unix seconds ตอนส่ง — ใช้กัน replay</td></tr>
+<tr><td><code>X-SmartPole-Signature</code></td><td>ลายเซ็น Ed25519 (base64) ของ <code>timestamp + "." + rawBody</code></td></tr>
+<tr><td><code>X-SmartPole-Event-Id</code></td><td>ตรงกับ <code>eventId</code> ใน body — ใช้ dedup</td></tr>
+</table>
+
+<h2>5. ความปลอดภัยและการตรวจสอบ (Security &amp; Verification)</h2>
+<p class="muted">ส่วนสำคัญที่สุด — ทำ <b>ตามลำดับ</b> ก่อนรับข้อมูลเข้าระบบ</p>
+<p><span class="step">1</span><b>TLS:</b> รับเฉพาะ HTTPS (ปฏิเสธ http)</p>
+<p><span class="step">2</span><b>อ่าน raw body (bytes) เก็บไว้ก่อน parse</b> — signature คำนวณบน raw body ถ้า parse แล้ว serialize ใหม่จะไม่ตรง</p>
+<p><span class="step">3</span><b>ตรวจ Timestamp:</b> ถ้า <code>|now − timestamp| &gt; 300 วินาที (5 นาที)</code> → ปฏิเสธ (401) [กัน replay]</p>
+<p><span class="step">4</span><b>เลือก public key</b> ตาม <code>X-SmartPole-Key-Id</code></p>
+<p><span class="step">5</span><b>Verify signature (Ed25519):</b></p>
+<pre><code>message   = timestamp + "." + rawBody
+signature = base64_decode( X-SmartPole-Signature ไม่รวม "ed25519=" )
+valid     = Ed25519_verify(publicKey, signature, message)
+ถ้า valid = false  →  ปฏิเสธ (401 Unauthorized)</code></pre>
+<p><span class="step">6</span><b>Dedup:</b> ถ้า <code>eventId</code> เคยรับแล้ว → ตอบ <b>2xx ทันที</b> (idempotent — ไม่ประมวลผล/นับซ้ำ)</p>
+<div class="callout crit"><b>สำคัญ:</b> ต้อง verify signature <b>ก่อน</b> นำข้อมูลไปใช้เสมอ — signature ที่ผ่านยืนยันว่า (ก) มาจาก Smart Pole จริง (ข) payload ไม่ถูกแก้ไขระหว่างทาง</div>
+
+<h2>6. สัญญาการตอบกลับ (HTTP Response Contract)</h2>
+<table>
+<tr><th>ผู้รับตอบ</th><th>ความหมาย</th><th>ผู้ส่งจะ</th></tr>
+<tr><td><b>2xx</b> (200/204)</td><td>รับสำเร็จ (หรือ dedup แล้ว)</td><td>ไม่ retry</td></tr>
+<tr><td><b>4xx</b> (400/401/422)</td><td>คำขอผิด (signature/schema/timestamp ไม่ผ่าน)</td><td><b>ไม่ retry</b> (ต้องแก้ที่ต้นเหตุ)</td></tr>
+<tr><td><b>5xx</b> (500/503)</td><td>ปัญหาชั่วคราวฝั่งผู้รับ</td><td><b>retry แบบ exponential backoff</b></td></tr>
+</table>
+<div class="callout warn"><b>ตอบให้เร็ว</b> (ภายใน ~10 วินาที) — แนะนำ "รับแล้วตอบ 2xx ก่อน แล้วค่อยประมวลผล/เขียน DB แบบ async" เพื่อไม่ให้ผู้ส่ง retry เพราะผู้รับช้า</div>
+<div class="callout info"><b>กรณี receiver รับไม่ไหว (overload):</b> ให้ตอบ <b>5xx</b> — <u>อย่าปล่อย timeout</u> · ผู้ส่งมี retry (จำกัดครั้ง) + <b>circuit breaker</b> ที่จะ backoff แล้ว "หยุดยิงชั่วคราว" ให้เองเมื่อผู้รับส่ง 5xx ต่อเนื่อง → ช่วยลดภาระทั้งสองฝั่ง (ผู้ส่งไม่กระหน่ำ ผู้รับได้พัก)</div>
+
+<h2>7. การจัดเก็บและตรวจข้อมูล (Data Handling)</h2>
+<ol>
+  <li>parse JSON → ตรวจ field ครบ + type ถูกต้อง (schema validation)</li>
+  <li>ตรวจ <code>schemaVersion</code> ว่ารองรับ — ถ้าเวอร์ชันไม่รู้จัก ตอบ 4xx</li>
+  <li>บันทึก <code>eventId</code> (สำหรับ dedup) พร้อมข้อมูล</li>
+  <li><b>ใช้ <code>measuredAt</code> เป็นเวลาของข้อมูล</b> — ไม่ใช่ <code>sentAt</code> หรือเวลาที่รับ</li>
+  <li>ยอมรับ <code>metrics</code> ที่เป็น <code>null</code> รายตัว</li>
+  <li>ตีความหน่วยตามสเปค (°C / %RH / µg/m³)</li>
+</ol>
+
+<h2>8. การจัดการข้อมูลขาด (Gap Handling)</h2>
+<ol>
+  <li><b>ไม่ได้รับข้อมูลบางช่วง = ปกติ ไม่ใช่ error</b> — หมายถึง เสา / sensor / ระบบต้นทาง down ชั่วคราว</li>
+  <li>ใช้ <code>seq</code> + <code>measuredAt</code> ตรวจว่าข้อมูลขาดช่วงใด (เรียงลำดับ / หา gap)</li>
+  <li><b>ผู้ส่งจะไม่ส่งค่าเก่าหลอก</b> — ถ้า sensor ไม่ทำงาน จะ "ไม่ส่ง" (ช่องว่าง ≠ ค่าค้าง)</li>
+</ol>
+
+<h2>9. การเสริมความปลอดภัย (Hardening — แนะนำ)</h2>
+<table>
+<tr><th>มาตรการ</th><th>รายละเอียด</th><th>ระดับ</th></tr>
+<tr><td>IP allowlist</td><td>รับเฉพาะ IP / Cloudflare ranges ของผู้ส่ง (แจ้งให้)</td><td><span class="tag opt">แนะนำ</span></td></tr>
+<tr><td>mTLS</td><td>ขอ client certificate ของผู้ส่ง verify เพิ่มอีกชั้น</td><td><span class="tag opt">option</span></td></tr>
+<tr><td>Rate limit + body size limit</td><td>กัน abuse / DoS</td><td><span class="tag opt">แนะนำ</span></td></tr>
+<tr><td>Audit log</td><td>log ทุก request (accept/reject + เหตุผล)</td><td><span class="tag opt">แนะนำ</span></td></tr>
+</table>
+
+<h2>10. สิ่งที่เราส่งมอบ / สิ่งที่ผู้รับไม่ต้องทำ</h2>
+<h3>ผู้ส่ง (Smart Pole) ส่งมอบให้</h3>
+<ol>
+  <li>Public key (Ed25519) + Key-Id (ผ่านช่องทางปลอดภัย)</li>
+  <li>เอกสารสเปคนี้ + ตัวอย่าง payload / headers</li>
+  <li>Reference receiver code (ตัวอย่างที่ verify ครบ)</li>
+  <li>การทดสอบร่วม: ยิง signed request จริง + ชุด test cases</li>
+</ol>
+<h3>ผู้รับ <b>ไม่ต้อง</b> ทำ (เพราะเป็น one-way)</h3>
+<ol>
+  <li>ไม่ต้องเรียก/ยิงกลับหาผู้ส่ง</li>
+  <li>ไม่ต้องเก็บ secret ของผู้ส่ง — มีแค่ <b>public key</b> (เปิดเผยได้ ปลอมข้อความไม่ได้)</li>
+  <li>ไม่ต้อง poll / ดึงข้อมูลเอง</li>
+</ol>
+
+<h2>11. ภาคผนวก</h2>
+<h3>A. ตัวอย่าง signed request (curl)</h3>
+<pre><code>curl -X POST https://receiver.example.go.th/smart-pole/ingest \
+  -H "Content-Type: application/json" \
+  -H "X-SmartPole-Key-Id: spole-2026" \
+  -H "X-SmartPole-Timestamp: 1785807300" \
+  -H "X-SmartPole-Signature: ed25519=Base64Signature==" \
+  -H "X-SmartPole-Event-Id: 9f1c2b7e-4d3a-4b6e-9c11-8a5e2f0d7b34" \
+  --data-binary '{"schemaVersion":"1.0","source":"smart-pole",...}'</code></pre>
+
+<h3>B. Pseudo-code การ verify (ฝั่งผู้รับ)</h3>
+<pre><code>function handlePush(request):
+    rawBody   = request.readRawBytes()          # ก่อน parse
+    keyId     = request.header("X-SmartPole-Key-Id")
+    timestamp = request.header("X-SmartPole-Timestamp")
+    sigB64    = request.header("X-SmartPole-Signature").removePrefix("ed25519=")
+    eventId   = request.header("X-SmartPole-Event-Id")
+
+    if abs(now() - timestamp) &gt; 300:  return 401   # replay
+    pubKey  = lookupPublicKey(keyId)
+    message = timestamp + "." + rawBody
+    if not ed25519_verify(pubKey, base64decode(sigB64), message):
+        return 401                                   # bad signature
+    if seenBefore(eventId):  return 200              # idempotent
+    data = parseAndValidate(rawBody)                 # schema
+    store(eventId, data)                             # ใช้ measuredAt
+    return 200</code></pre>
+
+<h3>C. Test cases ที่ receiver ต้องผ่าน</h3>
+<table>
+<tr><th>กรณีทดสอบ</th><th>ผู้รับต้อง</th></tr>
+<tr><td>signed ถูกต้อง</td><td>✅ ตอบ 2xx + บันทึกข้อมูล</td></tr>
+<tr><td>แก้ body (tamper)</td><td>❌ ปฏิเสธ 401 (signature ไม่ตรง)</td></tr>
+<tr><td>timestamp เก่ากว่า 5 นาที</td><td>❌ ปฏิเสธ 401 (replay)</td></tr>
+<tr><td>eventId ซ้ำ</td><td>⏭️ ตอบ 2xx แต่ไม่บันทึกซ้ำ (dedup)</td></tr>
+<tr><td>schema/หน่วยผิด</td><td>❌ ปฏิเสธ 4xx</td></tr>
+<tr><td>metrics บางตัวเป็น null</td><td>✅ รับได้ (บันทึกเท่าที่มี)</td></tr>
+</table>
+
+<footer>
+Smart Pole — Data Push Integration Guide (Receiver) · Standard v1.0 · schemaVersion 1.0 · Ed25519<br>
+เอกสารนี้เป็นมาตรฐานกลางสำหรับผู้เชื่อมต่อทุกราย · การเปลี่ยนแปลงสเปคจะแจ้งผ่านการขึ้นเวอร์ชัน (schemaVersion / document version)
+</footer>
+
+</body>
+</html>
