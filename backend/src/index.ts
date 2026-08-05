@@ -20,6 +20,7 @@ import { sensorArchiveController } from "./modules/sensor-archive";
 import { alertController } from "./modules/alert";
 import { cameraClipController, cameraClipStreamController } from "./modules/camera-clip";
 import { systemLogController } from "./modules/system-log";
+import { sensorPushController, sensorPushService } from "./modules/sensor-push";
 import { websocketPlugin } from "./plugins/websocket";
 import { startMqttSubscriber, stopMqttSubscriber } from "./plugins/mqtt";
 import { heartbeatScanService } from "./modules/heartbeat-scan";
@@ -91,6 +92,7 @@ const app = new Elysia()
   .use(cameraClipController)
   .use(cameraClipStreamController)
   .use(systemLogController)
+  .use(sensorPushController)
   .use(websocketPlugin)
   .listen(env.PORT);
 
@@ -106,6 +108,7 @@ try {
 // ── Start scheduler jobs ──
 try {
   heartbeatScanService.start();
+  sensorPushService.start(); // gated by SENSOR_PUSH_ENABLED — idle เมื่อ flag off
 } catch (err) {
   logger.error({ err }, "Scheduler: failed to start");
 }

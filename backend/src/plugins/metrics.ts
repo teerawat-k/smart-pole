@@ -57,6 +57,21 @@ export const sensorReadsTotal = new Counter({
   registers: [registry],
 });
 
+// ── Sensor push (outbound to external receivers) ──
+export const pushTotal = new Counter({
+  name: "sensor_push_total",
+  help: "Sensor push attempts to external receivers",
+  labelNames: ["receiver", "status"] as const, // status: ok | <http-code> | 0(network)
+  registers: [registry],
+});
+
+export const pushSkipped = new Counter({
+  name: "sensor_push_skipped_total",
+  help: "Sensor push skipped (freshness / dedup / circuit-open)",
+  labelNames: ["receiver", "reason"] as const,
+  registers: [registry],
+});
+
 // ── Domain gauges (updated from outside) ──
 export const polesOnlineGauge = new Gauge({
   name: "smart_pole_poles_online",

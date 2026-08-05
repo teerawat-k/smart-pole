@@ -270,6 +270,7 @@ model Pole {
 
   readings      SensorReading[]
   alerts        Alert[]
+  pushStates    PushState[]
 
   @@index([poleStatus, lastSeenAt])
   @@index([deletedAt])
@@ -322,5 +323,28 @@ model Alert {
   @@index([poleId, isResolved, triggeredAt(sort: Desc)])
   @@index([severity])
   @@index([alertType])
+}
+
+// ── Sensor Push state (ต่อ pole + receiver) ────────────────
+// เก็บ anchor/last-pushed/circuit-breaker → รอด host restart · ไม่ใช่ master model (ไม่มี soft delete)
+model PushState {
+  id               Int      @id @default(autoincrement())
+  poleId           Int
+  receiverKey      String   // ระบุ receiver (default "default")
+  anchorAt         BigInt?  // epoch ms — online ล่าสุด (reset anchor)
+  nextPushAt       BigInt?  // epoch ms — tick ถัดไป
+  lastPushedSeq    BigInt?
+  lastPushedAt     BigInt?  // epoch ms
+  // circuit breaker
+  circuitState     String   @default("closed") // closed | open | half_open
+  circuitFailCount Int      @default(0)
+  circuitOpenedAt  BigInt?  // epoch ms
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  pole Pole @relation(fields: [poleId], references: [id], onDelete: Cascade)
+
+  @@unique([poleId, receiverKey])
+  @@index([poleId])
 }
 

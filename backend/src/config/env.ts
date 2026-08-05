@@ -30,6 +30,19 @@ const envSchema = z.object({
 
   // Logging
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
+
+  // ── Sensor Push API (outbound push ข้อมูล sensor → ระบบภายนอก) ──
+  // ปิดโดย default — เปิดใช้เมื่อ receiver + key พร้อม (ดู docs/integration/sensor-push-api.md)
+  SENSOR_PUSH_ENABLED: z.string().default("false").transform((v) => v === "true"),
+  SENSOR_PUSH_RECEIVER_URL: z.string().default(""), // endpoint ปลายทาง (ว่าง = ไม่ยิง)
+  SENSOR_PUSH_KEY_ID: z.string().default("spole-2026"),
+  SENSOR_PUSH_PRIVATE_KEY: z.string().default(""), // Ed25519 PKCS8 PEM (\\n ได้)
+  SENSOR_PUSH_INTERVAL_SEC: z.coerce.number().default(300), // 5 นาที
+  SENSOR_PUSH_FRESHNESS_SEC: z.coerce.number().default(240), // 4 นาที
+  SENSOR_PUSH_TIMEOUT_MS: z.coerce.number().default(10_000),
+  SENSOR_PUSH_MAX_RETRY: z.coerce.number().default(3),
+  SENSOR_PUSH_CIRCUIT_FAIL_THRESHOLD: z.coerce.number().default(5),
+  SENSOR_PUSH_CIRCUIT_COOLDOWN_SEC: z.coerce.number().default(600), // 10 นาที
 });
 
 const parsed = envSchema.safeParse(process.env);
